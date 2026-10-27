@@ -1,7 +1,7 @@
 # Homunculus
 
 An experimental animation-authoring workspace: direct a physical character,
-refine its performance, and export the motion. **Force Puppet** is the first
+refine its performance, and export the motion. **Homunculus** is the first
 feasibility experiment within Homunculus.
 
 ![Supported physical reach editor](docs/evidence/editor.png)
