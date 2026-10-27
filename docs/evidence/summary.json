@@ -1,0 +1,51 @@
+{
+  "machine": "Windows",
+  "python": "3.13.1",
+  "cases": {
+    "clean": {
+      "tracking_rmse_deg": 2.8582713889653517,
+      "contact_steps": 0,
+      "max_penetration_m": 0.0,
+      "saturated_fraction": 0.0,
+      "peak_torque_Nm": [
+        7.228497412308695,
+        1.400816004885942
+      ],
+      "simulation_wall_s": 0.12820329994428903,
+      "steps": 2000,
+      "mujoco": "3.17.0",
+      "timestep_s": 0.002,
+      "export_max_component_error_m": 6.261871154933374e-08
+    },
+    "blocked": {
+      "tracking_rmse_deg": 21.342176661400917,
+      "contact_steps": 1507,
+      "max_penetration_m": 0.002494390094650835,
+      "saturated_fraction": 0.5747126436781609,
+      "peak_torque_Nm": [
+        35.0,
+        8.234674005735288
+      ],
+      "simulation_wall_s": 0.13751999998930842,
+      "steps": 2000,
+      "mujoco": "3.17.0",
+      "timestep_s": 0.002,
+      "export_max_component_error_m": 2.19783538035756e-08
+    },
+    "slow_loose": {
+      "tracking_rmse_deg": 4.658483948842416,
+      "contact_steps": 0,
+      "max_penetration_m": 0.0,
+      "saturated_fraction": 0.0,
+      "peak_torque_Nm": [
+        6.850160745855222,
+        1.3360133850124634
+      ],
+      "simulation_wall_s": 0.17822549992706627,
+      "steps": 3000,
+      "mujoco": "3.17.0",
+      "timestep_s": 0.002,
+      "export_max_component_error_m": 5.77202612372929e-08
+    }
+  }
+}
