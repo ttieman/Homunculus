@@ -7,6 +7,7 @@ import os
 from puppet import Edit, run
 from exporter import export_gltf
 from meta import propose, MODEL
+from motion import prepare
 
 ROOT = Path(__file__).parent
 
@@ -42,12 +43,16 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(403,{'error':'Local origin required'})
         try:
             size = int(self.headers.get('Content-Length','0'))
-            if not 0 < size <= 16384:
-                raise ValueError('Request size must be 1–16384 bytes')
+            if not 0 < size <= 524288:
+                raise ValueError('Request size must be 1–524288 bytes')
             body = json.loads(self.rfile.read(size))
+            if self.path == '/api/capture/validate':
+                motion = prepare(body['capture'])
+                return self.send(200,{'metadata':motion.metadata})
             edit = Edit.parse(body['edit'])
             if self.path == '/api/simulate':
-                result = run(edit)
+                motion = prepare(body['capture']) if body.get('capture') is not None else None
+                result = run(edit,motion)
                 return self.send(200,{'result':result,'gltf':export_gltf(result)})
             if self.path == '/api/propose':
                 return self.send(200,propose(body['prompt'],edit))

@@ -30,7 +30,9 @@ class Edit:
         return result
 
 
-def model_for(edit):
+def model_for(edit, captured=False):
+    shoulder_range = '-2.8 2.8' if captured else '-.3 1.9'
+    elbow_range = '-2.8 2.8' if captured else '-1.9 .8'
     obstacle = '<geom name="obstacle" type="box" pos=".47 1.65 0" size=".075 .12 .16" rgba=".9 .48 .2 1"/>' if edit.obstacle else ''
     return mujoco.MjModel.from_xml_string(f'''<mujoco model="Force Puppet supported arm">
       <compiler angle="radian"/>
@@ -39,10 +41,10 @@ def model_for(edit):
       <worldbody>
         {obstacle}
         <body name="upper_arm" pos="0 1.4 0">
-          <joint name="shoulder" type="hinge" axis="0 0 1" range="-.3 1.9"/>
+          <joint name="shoulder" type="hinge" axis="0 0 1" range="{shoulder_range}"/>
           <geom type="capsule" fromto="0 0 0 .34 0 0" size=".045" mass="1.4"/>
           <body name="forearm" pos=".34 0 0">
-            <joint name="elbow" type="hinge" axis="0 0 1" range="-1.9 .8"/>
+            <joint name="elbow" type="hinge" axis="0 0 1" range="{elbow_range}"/>
             <geom type="capsule" fromto="0 0 0 .29 0 0" size=".035" mass=".9"/>
             <site name="hand" pos=".29 0 0" size=".045"/>
           </body>
@@ -61,17 +63,21 @@ def reference(t, edit):
     return np.radians([edit.shoulder_deg, edit.elbow_deg]) * blend
 
 
-def run(edit):
-    model = model_for(edit)
+def run(edit, motion=None):
+    model = model_for(edit, captured=motion is not None)
     data = mujoco.MjData(model)
+    if motion is not None:
+        data.qpos[:] = motion.target(0,edit.duration)
     mujoco.mj_forward(model, data)
+    if motion is not None and data.ncon:
+        raise ValueError('Captured starting pose overlaps the obstacle; disable obstacle or trim the capture')
     frames, errors, torques = [], [], []
     contact_steps = saturated = 0
     penetration = 0.0
     started = time.perf_counter()
     steps = round(edit.duration / model.opt.timestep)
     for i in range(steps + 1):
-        target = reference(data.time, edit)
+        target = reference(data.time, edit) if motion is None else motion.target(data.time,edit.duration)
         # Ordinary PD + model gravity/bias compensation, NOT Tan et al.'s stable PD.
         desired = 90*edit.strength*(target-data.qpos) - 8*edit.damping*data.qvel + data.qfrc_bias
         torque = np.clip(desired, [-35, -20], [35, 20])
@@ -91,7 +97,9 @@ def run(edit):
             mujoco.mj_forward(model, data)
         if not np.all(np.isfinite(data.qpos)) or any(w.number for w in data.warning):
             raise RuntimeError('Simulation became invalid or issued a MuJoCo warning')
-    return {'schema': 1, 'source': 'original procedural reach fixture', 'inference': 'NOT_RUN',
+    return {'schema': 1, 'source': 'original procedural reach fixture' if motion is None else 'imported '+motion.metadata['provenance']['kind']+' arm motion',
+            'inference': 'NOT_RUN' if motion is None else motion.metadata['inference'],
+            'capture': None if motion is None else motion.metadata,
             'assistance': 'fixed world shoulder; no balance controller', 'coordinates': 'RH, +Y up, metres, seconds, radians',
             'edit': asdict(edit), 'frames': frames,
             'metrics': {'tracking_rmse_deg': float(np.degrees(np.sqrt(np.mean(np.square(errors))))),

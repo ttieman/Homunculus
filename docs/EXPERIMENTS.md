@@ -76,3 +76,33 @@ The Linux worker was actively serving another model request during repeated
 checks. No service was interrupted. Its completion is a prerequisite for GPU
 takeover, as requested by the user. Missing Meta access remains the next essential
 dependency even after the worker becomes free.
+
+## Experiment 002 — capture adapter (2026-10-27)
+
+Implemented offline SAM video worker, raw numeric-output retention, source overlays,
+explicit basis mapping, short-gap interpolation, angle cleanup and motion-driven
+simulation. Browser import/validation, reviewed application, local video preview,
+source-hash matching and capture-aware undo/export are implemented.
+
+**PASS:** 32 total tests, including known analytic mapping, scale/translation
+invariance, proper basis conversion, missing data and bad observations, time
+stretch, repeatability and simulated-output export. Live HTTP capture simulation
+with an explicitly labelled synthetic observation bundle measured 1.9852-degree
+tracking RMS for a four-second free reach. This is NOT a SAM accuracy result.
+
+**PASS:** browser selected a fixture JSON, displayed synthetic provenance and
+diagnostics, required the review checkbox and applied motion to physics. It
+disabled pose sliders and unsupported language edits while retaining physical
+controls. Browser Undo restored the procedural source and its controls. Captured
+motion contact and initial-overlap rejection also passed. Worker CLI help and
+Python/JavaScript syntax checks passed. `evidence/capture-import.png` shows the
+explicitly labelled synthetic importer test, not a SAM inference result.
+
+**BLOCKED:** actual video decoding plus SAM inference has not been executed.
+Approved weights and an owned input recording are still required. The worker's
+GPU memory/runtime and prediction quality are unmeasured. All numeric arm tests
+use synthetic observations, never presented as real capture.
+
+Latest worker inspection: ~11654 MiB GPU memory free; former model service reports
+failed, not successful completion. No service was restarted or interrupted by
+this experiment. No SAM environment/weights were installed there yet.

@@ -12,9 +12,16 @@
 <div class="metrics"><div class="metric"><span>Tracking error</span><strong id="error">—</strong><span>RMS across both joints</span></div><div class="metric"><span>Contact</span><strong id="contact">—</strong><span>Physics steps touching</span></div><div class="metric"><span>Simulation time</span><strong id="speed">—</strong><span>For the complete clip</span></div></div>
 <footer><button id="export">Export glTF</button><button id="replay">Replay export</button><button id="save">Save session</button></footer>
 <p id="message" role="status">Preparing the supported reach…</p>
-<p class="note">Original procedural reference · MuJoCo torque control · Shoulder anchored to the world.<br>This experiment tests physical response and editing. Full-body balance, captured motion and game retargeting are not included.</p>
-</main><aside><section><div class="eyebrow">01 / Refine</div><h3 style="margin-top:12px">Performance controls</h3>
-<label for="duration">Duration <output id="duration-value"></output></label><input id="duration" type="range" min="2" max="10" step=".2" value="4">
+<p class="note" id="source-note">Original procedural reference · MuJoCo torque control · Shoulder anchored to the world.<br>Full-body balance and game retargeting are not included.</p>
+<video id="source-video" muted playsinline controls hidden style="width:100%;max-height:300px"></video>
+</main><aside><section><div class="eyebrow">00 / Reference</div><h3 style="margin-top:12px">Bring a performance</h3>
+<label for="video-file">Preview your video locally</label><input id="video-file" type="file" accept="video/*">
+<label for="capture-file">Import worker capture.json</label><input id="capture-file" type="file" accept="application/json,.json">
+<p id="capture-status" class="note" role="status">Video stays in your browser. Run capture_video.py on the SAM worker, inspect its overlays, then import capture.json. SAM weights are not bundled.</p>
+<label><input id="review-capture" type="checkbox"> I checked the overlay, person and axis mapping</label>
+<button id="use-capture" disabled>Use captured motion</button> <button id="use-fixture">Use demo reach</button>
+</section><section><div class="eyebrow">01 / Refine</div><h3 style="margin-top:12px">Performance controls</h3>
+<label for="duration">Duration <output id="duration-value"></output></label><input id="duration" type="range" min="2" max="10" step=".1" value="4">
 <label for="shoulder_deg">Shoulder reach <output id="shoulder_deg-value"></output></label><input id="shoulder_deg" type="range" min="5" max="100" step="1" value="65">
 <label for="elbow_deg">Elbow bend <output id="elbow_deg-value"></output></label><input id="elbow_deg" type="range" min="-100" max="30" step="1" value="-35">
 <label for="strength">Muscle strength <output id="strength-value"></output></label><input id="strength" type="range" min=".1" max="2" step=".1" value="1">

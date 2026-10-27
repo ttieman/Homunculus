@@ -45,6 +45,7 @@ def export_gltf(result):
             'buffers':[{'byteLength':len(binary),'uri':'data:application/octet-stream;base64,'+base64.b64encode(binary).decode()}],
             'bufferViews':views,'accessors':accessors,
             'extras':{'provenance':result['source'],'assistance':result['assistance'],'edit':result['edit'],
+                      'capture':result.get('capture'),
                       'note':'Rigid articulated arm; no skin or game-skeleton retargeting. Obstacle is not exported.'}}
 
 

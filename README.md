@@ -13,7 +13,9 @@ MuJoCo owns the simulation. The reference reach is an original procedural fixtur
 **Meta integration:** a real Muse Spark adapter proposes validated edits through
 the same controls. Live inference is blocked until API access is configured;
 there are no fabricated model responses. SAM 3D Body capture is the next planned
-perception experiment, pending weight access. This is not yet the complete
+perception experiment, pending weight access. The offline video worker and capture
+importer are implemented; see [video capture instructions](docs/CAPTURE.md).
+This is not yet the complete
 Meta-powered product, a full-body controller, or a game-ready retargeted clip.
 
 ## Run
@@ -46,6 +48,7 @@ The shoulder is fixed to the world; the surrounding body silhouette is scenery.
 No free-standing balance or human muscle-force reconstruction is claimed.
 
 - [Setup and next experiment](docs/SETUP.md)
+- [Video to physical arm](docs/CAPTURE.md)
 - [Selected architecture and hardware inventory](docs/DECISIONS.md)
 - [Policies for every candidate model](docs/MODEL_POLICIES.md)
 - [Measured results and limitations](docs/EXPERIMENTS.md)
