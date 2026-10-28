@@ -37,6 +37,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(403,{'error':'Local origin required'})
         if self.path == '/api/contracts':
             return self.send(200,{'max_document_bytes':MAX_DOCUMENT_BYTES})
+        if self.path == '/api/commands':
+            from commands import tools
+            return self.send(200,{'tools':tools()})
         if self.path == '/api/status':
             return self.send(200,{'meta': 'configured; unverified' if configured_key() else 'blocked: no credentials', 'model':MODEL,
                                   'character': self.rig.summary() if self.rig else None})
@@ -45,7 +48,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200,self.rig.blob,'model/gltf-binary')
         js = 'text/javascript; charset=utf-8'
         paths = {'/':('index.html','text/html; charset=utf-8'), '/app.js':('app.js',js),
-                 '/stage3d.js':('stage3d.js',js), '/vendor/three.js':('vendor/three.js',js)}
+                 '/stage3d.js':('stage3d.js',js), '/workspace.js':('workspace.js',js), '/vendor/three.js':('vendor/three.js',js)}
         if self.path not in paths:
             return self.send(404,{'error':'Not found'})
         name, mime = paths[self.path]
@@ -59,6 +62,15 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < size <= MAX_DOCUMENT_BYTES:
                 raise ValueError(f'Request size must be 1–{MAX_DOCUMENT_BYTES} bytes')
             body = object_value(json.loads(self.rfile.read(size)),'request')
+            if self.path == '/api/chat':
+                from muse_chat import turn
+                return self.send(200,turn(body))
+            if self.path == '/api/pose':
+                from pose_editor import adjust
+                return self.send(200,{'capture':adjust(body['capture'],{k:v for k,v in body.items() if k!='capture'})})
+            if self.path == '/api/commands/validate':
+                from commands import validate_command
+                return self.send(200,{'arguments':validate_command(body.get('name'),body.get('arguments'))})
             if self.path == '/api/capture/validate':
                 motion = prepare(body['capture'])
                 return self.send(200,{'metadata':motion.metadata})

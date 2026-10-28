@@ -45,6 +45,7 @@ export function createStage(canvas) {
   canvas.dataset.renderer = 'webgl';
 
   const scene = new THREE.Scene();
+  const sceneProps = new THREE.Group(); scene.add(sceneProps);
   const camera = new THREE.PerspectiveCamera(38, 1, .05, 50);
   camera.position.copy(HOME.position);
 
@@ -160,6 +161,12 @@ export function createStage(canvas) {
   function placeCharacter(side, toPuppet) {
     const key = side + JSON.stringify(toPuppet);
     if (!character.root || character.key === key) return;
+    if (character.side && character.side !== side) {
+      for (const b of ['upper_arm','forearm']) {
+        const old=bone(b,character.side);old.quaternion.copy(old.userData.restRotation);
+      }
+    }
+    character.side=side;
     character.key = key;
     // toPuppet (row-major 3x3, from the server's retarget) maps character axes into the puppet/camera frame;
     // it may be a mirror for side-on left arms, which decompose() turns into a negative X scale.
@@ -174,13 +181,28 @@ export function createStage(canvas) {
 
   const projected = new THREE.Vector3();
   return {
+    configure(settings) {
+      scene.background = new THREE.Color(settings.background);
+      grid.visible = settings.grid; key.intensity = settings.light;
+      for (const child of [...sceneProps.children]) {
+        sceneProps.remove(child); child.geometry.dispose(); child.material.dispose();
+      }
+      for (const item of settings.props) {
+        const geometry = item.shape === 'sphere' ? new THREE.SphereGeometry(.5,24,16) : new THREE.BoxGeometry(1,1,1);
+        const mesh = new THREE.Mesh(geometry,material(item.color));
+        mesh.name = item.id; mesh.position.fromArray(item.position); mesh.scale.fromArray(item.scale);
+        mesh.castShadow = mesh.receiveShadow = true; sceneProps.add(mesh);
+      }
+      const positions = {home:[2.05,1.95,3],front:[.2,1.1,3.5],side:[3.5,1.1,0],top:[.2,4,.01]};
+      camera.position.fromArray(positions[settings.camera]); controls.target.copy(HOME.target); controls.update();
+    },
     async loadCharacter(url) {
       const gltf = await loader.loadAsync(url);
       character.root = new THREE.Group();
       character.root.add(gltf.scene);
       gltf.scene.traverse(o => {
         if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; }
-        if (o.name) character.bones[o.name] = o;
+        if (o.name) {character.bones[o.name] = o;o.userData.restRotation=o.quaternion.clone();}
       });
       for (const s of 'LR') for (const b of ['upper_arm', 'forearm', 'hand'])
         if (!bone(b, s)) throw new Error(`Character is missing ${b}.${s}`);

@@ -1,4 +1,5 @@
 import {createStage} from './stage3d.js';
+import {createWorkspace} from './workspace.js';
 const $=id=>document.getElementById(id);
 const names=['duration','shoulder_deg','elbow_deg','strength','damping'];
 let current=null, result=null, gltf=null, characterGlb=null, history=[], redoHistory=[], audit=[], proposal=null, busy=false;
@@ -18,7 +19,7 @@ async function simulate(edit,source='manual',remember=true,capture=activeCapture
   try{const view=$('character-view').value;const payload=await api(optimize?'/api/synthesize':'/api/simulate',{edit,capture,...(view==='auto'?{}:{view})});if(remember)redoHistory=[];if(remember&&current)history.push(structuredClone({edit:current,capture:activeCapture}));
     edit=payload.result.edit;current=edit;activeCapture=capture;result=payload.result;gltf=payload.gltf;characterGlb=payload.character_glb||null;cursor=0;exported=false;replayFrames=null;stage?.setReplayClip(null);$('export-character').disabled=!characterGlb;proposal=null;$('accept').hidden=true;$('proposal').textContent='';
     $('shoulder_deg').disabled=!!capture;$('elbow_deg').disabled=!!capture;
-    $('source-note').textContent=capture?'Imported '+capture.provenance.kind+' arm motion · Fixed shoulder · Recorded angles own the pose; duration, strength and damping remain editable. Language edits can change timing; new poses and forces are not supported.':'Original procedural reference · MuJoCo torque control · Fixed shoulder. Full-body balance and game retargeting are not included.';
+    $('source-note').textContent=capture?'Imported '+capture.provenance.kind+' arm motion · Fixed shoulder · Recorded angles own the pose; duration, strength and damping remain editable. Language edits can change timing; new poses and forces are not supported.':'Original procedural reference · MuJoCo torque control · Fixed shoulder. Arm-to-character retargeting is available; full-body balance is not included.';
     audit.push({source,edit:structuredClone(edit),at:new Date().toISOString()});fill(edit);
     $('error').textContent=result.metrics.tracking_rmse_deg.toFixed(2)+'°';$('contact').textContent=result.metrics.contact_steps;
     $('speed').textContent=Math.round(result.metrics.simulation_wall_s*1000)+' ms';
@@ -52,7 +53,7 @@ $('export-character').onclick=()=>{if(!characterGlb)return;const url=URL.createO
 $('save').onclick=()=>result&&download('force-puppet-session.json',{edit:current,capture:activeCapture,audit,result,gltf});
 function reviewReady(){lock(busy);}
 $('review-capture').onchange=reviewReady;
-$('video-file').onchange=async()=>{const f=$('video-file').files[0];if(!f)return;
+async function loadVideo(f){if(!f)return;
   if(f.size>100*1024*1024){$('capture-status').textContent='Choose a video under 100 MB.';return;}
   if(videoURL)URL.revokeObjectURL(videoURL);videoURL=URL.createObjectURL(f);$('source-video').src=videoURL;$('source-video').hidden=false;$('source-pane').hidden=false;$('comparison').classList.add('has-video');document.body.classList.add('comparison-active');
   videoHash=null;hashingVideo=true;$('review-capture').checked=false;reviewReady();
@@ -60,6 +61,7 @@ $('video-file').onchange=async()=>{const f=$('video-file').files[0];if(!f)return
     $('capture-status').textContent=pendingCapture&&pendingCapture.provenance.video_sha256!==videoHash?'Video does not match imported capture. Select the original video.':'Local video ready. Process it with the worker and import capture.json.';
   }catch(e){$('capture-status').textContent=e.message;}finally{hashingVideo=false;reviewReady();}
 };
+$('video-file').onchange=()=>loadVideo($('video-file').files[0]);
 $('capture-file').onchange=async()=>{const f=$('capture-file').files[0];pendingCapture=null;$('review-capture').checked=false;reviewReady();if(!f)return;
   try{if(!maxDocumentBytes)throw Error('Document limits are loading; select the file again.');if(f.size>maxDocumentBytes)throw Error('Capture exceeds the '+maxDocumentBytes+' byte document limit.');const candidate=JSON.parse(await f.text());const checked=await api('/api/capture/validate',{capture:candidate});
     pendingCapture=candidate;const dimensionality=candidate.retargeting==='spatial_arm_v1'?'3D arm':checked.metadata.max_out_of_plane_deg.toFixed(1)+' degrees out of plane';$('capture-status').textContent=candidate.provenance.kind+' / '+checked.metadata.source_duration_s.toFixed(2)+' s / '+dimensionality+' / '+checked.metadata.missing_frames+' missing frames. Inspect overlays and confirm the mapping.';
@@ -74,8 +76,8 @@ $('use-capture').onclick=async()=>{if(!pendingCapture||!$('review-capture').chec
 $('character-view').onchange=()=>{if(current&&!busy)simulate(current,'recording view',false,activeCapture);};
 $('use-fixture').onclick=()=>simulate(fields(),'procedural fixture',true,null);
 function readAccessor(doc,index,width){const a=doc.accessors[index],v=doc.bufferViews[a.bufferView];const bytes=Uint8Array.from(atob(doc.buffers[v.buffer].uri.split(',')[1]),c=>c.charCodeAt(0));const view=new DataView(bytes.buffer);return Array.from({length:a.count},(_,i)=>Array.from({length:width},(_,j)=>view.getFloat32((v.byteOffset||0)+(a.byteOffset||0)+(i*width+j)*4,true)));}
-$('replay').onclick=()=>{if(!gltf)return;exported=!exported;if(exported){const samplers=gltf.animations[0].samplers;const tracks=samplers.map(s=>readAccessor(gltf,s.output,4));const times=readAccessor(gltf,samplers[0].input,1);replayFrames=times.map((t,i)=>({t:t[0],rotations:tracks.map(track=>track[i]),q:tracks.map(track=>2*Math.atan2(track[i][2],track[i][3])),...quaternionArm(tracks.map(track=>track[i]))}));}
-  stage?.setReplayClip(exported&&characterGlb?glbBytes(characterGlb).buffer:null).catch(e=>{$('message').textContent=e.message;});
+$('replay').onclick=async()=>{if(!gltf)return;exported=!exported;if(exported){const samplers=gltf.animations[0].samplers;const tracks=samplers.map(s=>readAccessor(gltf,s.output,4));const times=readAccessor(gltf,samplers[0].input,1);replayFrames=times.map((t,i)=>({t:t[0],rotations:tracks.map(track=>track[i]),q:tracks.map(track=>2*Math.atan2(track[i][2],track[i][3])),...quaternionArm(tracks.map(track=>track[i]))}));}
+  try{await stage?.setReplayClip(exported&&characterGlb?glbBytes(characterGlb).buffer:null);}catch(e){exported=false;throw e;}
   $('view-label').textContent=exported?'glTF replay · decoded animation buffers'+(characterGlb?' (arm + character clip)':''):'Physical result · fixed shoulder';$('replay').textContent=exported?'Back to simulation':'Replay export';};
 $('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'Pause':'Play';$('play').setAttribute('aria-label',playing?'Pause playback':'Play playback');};
 $('timeline').oninput=()=>{if(current)cursor=Number($('timeline').value)*current.duration;};
@@ -123,3 +125,72 @@ requestAnimationFrame(draw);
 fetch('/api/status').then(r=>r.json()).then(s=>{$('meta-status').textContent='Muse Spark · '+s.meta;
   if(s.character&&stage){$('export-character').hidden=false;$('physics-toggle').hidden=false;$('view-toggle').hidden=false;stage.loadCharacter('/character.glb').then(()=>{$('character-note').textContent='Character: '+s.character.source+' · arm directions retargeted; its own proportions are kept (tick Show physics arm to compare).';}).catch(e=>{$('character-note').textContent='Character failed to load: '+e.message;});}}).catch(e=>{$('meta-status').textContent=e.message;});
 simulate(fields(),'initial procedural fixture',false);
+
+// Manual buttons and Muse use this same action surface. No eval or DOM automation.
+const originalReplay=$('replay').onclick, originalCharacterExport=$('export-character').onclick;
+let appliedView=$('character-view').value, appliedPhysics=$('show-physics').checked;
+async function requireSimulation(edit=current,capture=activeCapture,optimize=false){
+  if(!await simulate(edit,'workspace command',false,capture,optimize))throw Error($('message').textContent);
+  appliedView=$('character-view').value;appliedPhysics=$('show-physics').checked;
+}
+async function timelineCommand(commands=null,three=false){
+  if(activeCapture?.retargeting!=='spatial_arm_v1')throw Error('A spatial capture is required');
+  const payload=await api('/api/reference',{capture:activeCapture,duration:current.duration,three_poses:three,...(commands?{commands}:{})});
+  await requireSimulation({...current,duration:payload.reference.keyframes.at(-1).time},payload.capture);
+  $('capture-status').textContent=payload.reference.keyframes.length+' editable keyframes. Save reference to retain this timeline.';
+  return {keyframes:payload.reference.keyframes.length,duration:current.duration};
+}
+function inspect(){return {settings:{edit:current||fields(),view:appliedView,showPhysics:appliedPhysics},
+  playback:{playing,time:cursor,replay:exported},characterLoaded:!!stage?.hasCharacter,
+  capture:activeCapture?{kind:activeCapture.provenance.kind,retargeting:activeCapture.retargeting}:null,
+  keyframes:activeCapture?.reference_animation?.keyframes?.map(k=>({id:k.id,time:k.time,interpolation:k.interpolation}))||[],
+  metrics:result?.metrics||null,limits:'Supported arm only; other body joints remain at rest. Decorative scene props have no collision.'};}
+const workspace=createWorkspace({
+  inspect,fields,download,busy:()=>busy,
+  configureScene:settings=>stage?.configure(settings),
+  validate:(name,args)=>api('/api/commands/validate',{name,arguments:args}),
+  validateCapture:capture=>api('/api/capture/validate',{capture}),
+  chat:body=>api('/api/chat',body),
+  snapshot:()=>structuredClone({edit:current||fields(),capture:activeCapture,view:appliedView,showPhysics:appliedPhysics,playing,time:cursor}),
+  restore:async value=>{$('character-view').value=value.view;await requireSimulation(value.edit,value.capture);$('show-physics').checked=appliedPhysics=value.showPhysics;playing=value.playing;cursor=value.time;},
+  useVideo:loadVideo,
+  useCapture:async capture=>{
+    await api('/api/capture/validate',{capture});
+    if(hashingVideo)throw Error('Wait for source video hashing');
+    if(videoHash&&capture.provenance.video_sha256!==videoHash)throw Error('Capture does not match the selected source video');
+    const frames=capture.frames,duration=capture.reference_animation?.keyframes.at(-1).time??frames.at(-1).t-frames[0].t;
+    if(capture.retargeting==='spatial_arm_v1')capture=(await api('/api/reference',{capture,duration})).capture;
+    await requireSimulation({...fields(),duration,obstacle:false},capture);return {status:'Captured motion applied',duration};
+  },
+  actions:{
+    set_settings:async args=>{
+      const oldView=appliedView;
+      if(activeCapture&&args.edit&&['shoulder_deg','elbow_deg'].some(k=>k in args.edit&&args.edit[k]!==current[k]))throw Error('Captured poses own these angles; use adjust_pose instead');
+      if(args.view)$('character-view').value=args.view;
+      try{if(args.edit||args.view)await requireSimulation({...current,...args.edit});}catch(e){$('character-view').value=oldView;throw e;}
+      if(args.showPhysics!==undefined)$('show-physics').checked=appliedPhysics=args.showPhysics;
+      return inspect().settings;
+    },
+    playback:async args=>{
+      if(args.time!==undefined&&args.time>current.duration)throw Error('Seek exceeds animation duration');
+      if(args.replay!==undefined&&args.replay!==exported){if(!gltf)throw Error('No export is available');await originalReplay();}
+      if(args.playing!==undefined)playing=args.playing;if(args.time!==undefined)cursor=args.time;
+      $('play').textContent=playing?'Pause':'Play';$('play').setAttribute('aria-label',playing?'Pause playback':'Play playback');return inspect().playback;
+    },
+    simulate:()=>requireSimulation(),optimize:()=>requireSimulation(current,activeCapture,true),
+    use_demo:()=>requireSimulation(fields(),null),
+    edit_timeline:args=>timelineCommand(args.commands),assemble_three_poses:()=>timelineCommand(null,true),
+    export_asset:async({format})=>{
+      if(!result)throw Error('No result available');
+      if(format==='arm')download('homunculus-arm.gltf',gltf);
+      if(format==='character'){if(!characterGlb)throw Error('No character export available');originalCharacterExport();}
+      if(format==='session')download('homunculus-session.json',{edit:current,capture:activeCapture,audit,result,gltf});
+      if(format==='reference'){if(!activeCapture)throw Error('No captured reference');const p=await api('/api/reference',{capture:activeCapture,duration:fields().duration});download('homunculus-reference.json',p.capture);}
+      return {status:'Download requested',format};
+    },
+    adjust_pose:async args=>{if(!activeCapture)throw Error('Load a spatial capture first');const payload=await api('/api/pose',{capture:activeCapture,...args});await requireSimulation(current,payload.capture);return {status:'Pose adjusted',keyId:args.keyId};}
+  }
+});
+$('edit-key').onclick=async()=>{try{const p=await api('/api/reference',{capture:activeCapture,duration:current.duration});const k=p.reference.keyframes[Number($('key-index').value)-1];if(!k)throw Error('Invalid key number');await workspace.manual('edit_timeline',{commands:[{operation:'move_keyframe',targetId:k.id,parameters:{time:Number($('key-time').value)}},{operation:'set_interpolation',targetId:k.id,parameters:{interpolation:$('key-curve').value}}]});}catch(e){$('message').textContent=e.message;}};
+$('adjust-pose').onclick=async()=>{try{const p=await api('/api/reference',{capture:activeCapture});const k=p.reference.keyframes[Number($('key-index').value)-1];if(!k)throw Error('Invalid key number');await workspace.manual('adjust_pose',{keyId:k.id,joint:$('pose-joint').value,axis:$('pose-axis').value,degrees:Number($('pose-angle').value)});}catch(e){$('message').textContent=e.message;}};
+$('use-capture').onclick=async()=>{if(!pendingCapture||!$('review-capture').checked)return;try{const file=new File([JSON.stringify(pendingCapture)],'reviewed-capture.json',{type:'application/json'});const item=await workspace.attach(file);await workspace.manual('use_attachment',{id:item.id});}catch(e){$('message').textContent=e.message;}};
