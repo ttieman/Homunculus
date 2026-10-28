@@ -43,3 +43,5 @@ Existing game inspected read-only: Bevy =0.20.0, Jackdaw f3df43c and Avian
 252aac4; glTF Scene loading and AnimationGraph clip playback, Y-up metre-based
 stickman rig. Our new arm rig is not mapped to that skeleton. Game replay remains
 UNVERIFIED even if generic glTF replay passes.
+
+2026-10-27 update: SAM inference is operational. See SYNTHESIS.md for the additive spatial/timeline architecture, real-video experiment and current limitations. Earlier blocked-access and wait-for-worker statements are historical; the user explicitly authorized stopping the running compute job.

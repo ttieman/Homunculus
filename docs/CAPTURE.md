@@ -95,3 +95,7 @@ prediction; imported SAM provenance is labelled IMPORTED_UNVERIFIED locally.
 
 The worker resolves keypoint indices by the official names rather than assuming
 that wrist indices follow the COCO layout. It saves raw output before retargeting.
+
+## Spatial motion and longer clips
+
+Use --spatial for the explicit 3D arm path (2.1–30 seconds). Run synthesize.py locally on its capture.json. See [SYNTHESIS.md](SYNTHESIS.md) for editing, optimization and artifact contracts. The original planar path retains its stricter geometric limits.

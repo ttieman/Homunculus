@@ -20,7 +20,7 @@ class Edit:
         if not isinstance(values, dict) or set(values) - set(cls.__dataclass_fields__):
             raise ValueError('Unknown authoring fields')
         result = cls(**values)
-        for key, lo, hi in [('duration', 2, 10), ('shoulder_deg', 5, 100),
+        for key, lo, hi in [('duration', 2, 30), ('shoulder_deg', 5, 100),
                             ('elbow_deg', -100, 30), ('strength', .1, 2), ('damping', .2, 3)]:
             val = getattr(result, key)
             if isinstance(val, bool) or not isinstance(val, (float, int)) or not math.isfinite(val) or not lo <= val <= hi:
@@ -64,6 +64,9 @@ def reference(t, edit):
 
 
 def run(edit, motion=None):
+    from spatial import SpatialMotion, run_spatial
+    if isinstance(motion, SpatialMotion):
+        return run_spatial(edit, motion)
     model = model_for(edit, captured=motion is not None)
     data = mujoco.MjData(model)
     if motion is not None:

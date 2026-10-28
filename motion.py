@@ -17,6 +17,9 @@ class Motion:
 
 
 def prepare(bundle):
+    if isinstance(bundle,dict) and bundle.get('retargeting')=='spatial_arm_v1':
+        from spatial import prepare_spatial
+        return prepare_spatial(bundle)
     if not isinstance(bundle,dict) or bundle.get('schema') != 'homunculus.observations.v1':
         raise ValueError('Expected homunculus.observations.v1 capture bundle')
     provenance = bundle.get('provenance',{})

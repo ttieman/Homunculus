@@ -6,15 +6,13 @@ feasibility experiment within Homunculus.
 
 ![Supported physical reach editor](docs/evidence/editor.png)
 
-**Current delivery:** a supported two-joint physical arm with obstacle contact,
+**Current delivery:** planar and spatial supported-arm synthesis with obstacle contact,
 manual timing/strength/pose edits, undo, glTF export and independent replay.
-MuJoCo owns the simulation. The reference reach is an original procedural fixture.
+MuJoCo owns the simulation. SAM video observations drive spatial reference motion; the original procedural reach remains available.
 
 **Meta integration:** a real Muse Spark adapter proposes validated edits through
 the same controls. Live inference is blocked until API access is configured;
-there are no fabricated model responses. SAM 3D Body capture is the next planned
-perception experiment, pending weight access. The offline video worker and capture
-importer are implemented; see [video capture instructions](docs/CAPTURE.md).
+there are no fabricated model responses. SAM 3D Body has processed an owned video on the Linux GPU worker. Temporal cleanup, spatial retargeting, bounded controller search and physical glTF baking are implemented; see [synthesis](docs/SYNTHESIS.md) and [video capture instructions](docs/CAPTURE.md).
 This is not yet the complete
 Meta-powered product, a full-body controller, or a game-ready retargeted clip.
 

@@ -49,10 +49,31 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/api/capture/validate':
                 motion = prepare(body['capture'])
                 return self.send(200,{'metadata':motion.metadata})
+            if self.path == '/api/reference':
+                from spatial import SpatialMotion
+                from timeline import Timeline
+                motion=prepare(body['capture'])
+                if not isinstance(motion,SpatialMotion): raise ValueError('Spatial capture required')
+                timeline=motion.timeline
+                if body.get('three_poses') is True:
+                    doc=timeline.document
+                    keys=doc['keyframes']; doc['keyframes']=[keys[0],keys[len(keys)//2],keys[-1]]
+                    ids={k['poseId'] for k in doc['keyframes']};doc['poses']={k:v for k,v in doc['poses'].items() if k in ids}
+                    timeline=Timeline(doc)
+                if body.get('commands'): timeline=timeline.edited(body['commands'])
+                capture=body['capture'];capture['reference_animation']=timeline.document
+                prepare(capture)
+                return self.send(200,{'capture':capture,'reference':timeline.document})
             edit = Edit.parse(body['edit'])
-            if self.path == '/api/simulate':
+            if self.path in ('/api/simulate','/api/synthesize'):
                 motion = prepare(body['capture']) if body.get('capture') is not None else None
-                result = run(edit,motion)
+                if self.path == '/api/synthesize':
+                    from spatial import SpatialMotion, synthesize
+                    if not isinstance(motion,SpatialMotion): raise ValueError('Optimization requires a spatial capture')
+                    result,report = synthesize(motion,edit)
+                    result['optimization']=report
+                else:
+                    result = run(edit,motion)
                 return self.send(200,{'result':result,'gltf':export_gltf(result)})
             if self.path == '/api/propose':
                 return self.send(200,propose(body['prompt'],edit))

@@ -28,12 +28,13 @@ def main():
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--bbox',type=float,nargs=4,required=True,metavar=('X1','Y1','X2','Y2'))
     p.add_argument('--basis',type=float,nargs=9,required=True,help='Row-major native-to-puppet proper rotation, verified in preview')
+    p.add_argument('--spatial',action='store_true',help='Capture up to 30 seconds for spatial arm synthesis')
     p.add_argument('--side',choices=['right','left'],default='right')
     p.add_argument('--start',type=float,default=0)
     p.add_argument('--seconds',type=float,default=4)
     p.add_argument('--sample-hz',type=float,default=15)
     args=p.parse_args()
-    if not 2.1<=args.seconds<=10 or not 5<=args.sample_hz<=30 or not args.start>=0:
+    if not 2.1<=args.seconds<=(30 if args.spatial else 10) or not 5<=args.sample_hz<=30 or not args.start>=0:
         p.error('Use 2.1–10 seconds, 5–30 Hz and a nonnegative start')
     for name in ('video','checkpoint','mhr'):
         if not getattr(args,name).is_file(): p.error(f'BLOCKED: {name} file unavailable')
@@ -101,6 +102,12 @@ def main():
     (args.output/'capture.json').write_text(json.dumps(bundle,indent=2,allow_nan=False),encoding='utf-8')
     # Keep raw output even if the motion is outside the first puppet's supported scope.
     try:
+        if args.spatial:
+            bundle['retargeting']='spatial_arm_v1'
+            (args.output/'capture.json').write_text(json.dumps(bundle,indent=2,allow_nan=False),encoding='utf-8')
+            report={'status':'REQUIRES_LOCAL_SPATIAL_VALIDATION','frames':len(records)}
+            (args.output/'report.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+            print(json.dumps(report)); return
         prepared=prepare(bundle)
         report={'status':'READY_FOR_REVIEW','diagnostics':prepared.metadata}
     except (ValueError,KeyError,TypeError) as exc:

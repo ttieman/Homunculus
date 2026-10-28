@@ -106,3 +106,7 @@ use synthetic observations, never presented as real capture.
 Latest worker inspection: ~11654 MiB GPU memory free; former model service reports
 failed, not successful completion. No service was restarted or interrupted by
 this experiment. No SAM environment/weights were installed there yet.
+
+## Experiment 003 — real SAM capture and spatial synthesis
+
+See [SYNTHESIS.md](SYNTHESIS.md). The earlier SAM-blocked status is superseded. Real owned video inference, spatial torque tracking, controller search and independently verified glTF export now run. Full-body balance and captured-animation language editing remain incomplete.

@@ -27,7 +27,7 @@ def export_gltf(result):
     times = accessor([[f['t']] for f in result['frames']], 'SCALAR', True)
     samplers, channels = [], []
     for joint in range(2):
-        rot = accessor([[0,0,math.sin(f['q'][joint]/2),math.cos(f['q'][joint]/2)] for f in result['frames']], 'VEC4')
+        rot = accessor([f['local_rotations_xyzw'][joint] if 'local_rotations_xyzw' in f else [0,0,math.sin(f['q'][joint]/2),math.cos(f['q'][joint]/2)] for f in result['frames']], 'VEC4')
         samplers.append({'input': times, 'output': rot, 'interpolation': 'LINEAR'})
         channels.append({'sampler': joint, 'target': {'node': joint, 'path': 'rotation'}})
     return {'asset': {'version': '2.0', 'generator': 'Force Puppet'},
@@ -59,13 +59,16 @@ def replay_gltf(document):
         return [values[i:i+width] for i in range(0,len(values),width)]
     anim = document['animations'][0]
     rotations = [read(s['output'],4) for s in anim['samplers']]
-    hands = []
+    import numpy as np
+    def rotation(q):
+        x,y,z,w=q
+        return np.array([[1-2*(y*y+z*z),2*(x*y-z*w),2*(x*z+y*w)],
+                         [2*(x*y+z*w),1-2*(x*x+z*z),2*(y*z-x*w)],
+                         [2*(x*z-y*w),2*(y*z+x*w),1-2*(x*x+y*y)]])
+    hands=[]
     for a,b in zip(*rotations):
-        # Z-axis quaternion rotation matrix entries. Compose first and second rotation.
-        ca,sa = 1-2*a[2]*a[2],2*a[2]*a[3]
-        cb,sb = 1-2*b[2]*b[2],2*b[2]*b[3]
-        l1 = document['nodes'][1]['translation'][0]
-        l2 = document['nodes'][2]['translation'][0]
-        root = document['nodes'][0]['translation']
-        hands.append([root[0]+l1*ca+l2*(ca*cb-sa*sb), root[1]+l1*sa+l2*(sa*cb+ca*sb),root[2]])
+        root=np.array(document['nodes'][0]['translation'])
+        upper=np.array(document['nodes'][1]['translation'])
+        fore=np.array(document['nodes'][2]['translation'])
+        hands.append((root+rotation(a)@upper+rotation(a)@rotation(b)@fore).tolist())
     return hands
