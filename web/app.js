@@ -1,8 +1,8 @@
+import {createStage} from './stage3d.js';
 const $=id=>document.getElementById(id);
 const names=['duration','shoulder_deg','elbow_deg','strength','damping'];
 let current=null, result=null, gltf=null, history=[], redoHistory=[], audit=[], proposal=null, busy=false;
 let activeCapture=null, pendingCapture=null, videoHash=null, videoURL=null, hashingVideo=false;
-let cameraYaw=0;
 let maxDocumentBytes=0;
 fetch('/api/contracts').then(r=>r.json()).then(c=>{maxDocumentBytes=c.max_document_bytes;});
 let playing=true, cursor=0, exported=false, replayFrames=null, previous=performance.now();
@@ -79,20 +79,16 @@ function slerp(a,b,u){let dot=a.reduce((v,x,i)=>v+x*b[i],0);if(dot<0){b=b.map(x=
 function sampleFrames(frames,t){let lo=0,hi=frames.length-1;while(lo+1<hi){const mid=(lo+hi)>>1;if(frames[mid].t<=t)lo=mid;else hi=mid;}if(t>=frames.at(-1).t)return frames.at(-1);const a=frames[lo],b=frames[hi],u=Math.max(0,(t-a.t)/(b.t-a.t));const out={...a};for(const k of ['q','target','elbow','hand','target_elbow','target_hand'])if(a[k])out[k]=a[k].map((x,i)=>x+(b[k][i]-x)*u);if(a.rotations){out.rotations=a.rotations.map((q,i)=>slerp(q,b.rotations[i],u));Object.assign(out,quaternionArm(out.rotations));out.q=out.rotations.map(q=>2*Math.atan2(q[2],q[3]));}return out;}
 function rotate(q,v){const [x,y,z,w]=q;const t=[2*(y*v[2]-z*v[1]),2*(z*v[0]-x*v[2]),2*(x*v[1]-y*v[0])];return [v[0]+w*t[0]+y*t[2]-z*t[1],v[1]+w*t[1]+z*t[0]-x*t[2],v[2]+w*t[2]+x*t[1]-y*t[0]];}
 function quaternionArm(q){const a=rotate(q[0],[.34,0,0]);const b=rotate(q[0],rotate(q[1],[.29,0,0]));return {elbow:[a[0],1.4+a[1],a[2]],hand:[a[0]+b[0],1.4+a[1]+b[1],a[2]+b[2]]};}
-const canvas=$('stage'),ctx=canvas.getContext('2d');
-let dragX=null;canvas.onpointerdown=e=>{dragX=e.clientX;canvas.setPointerCapture(e.pointerId);};canvas.onpointermove=e=>{if(dragX!==null){cameraYaw+=(e.clientX-dragX)*.01;dragX=e.clientX;}};canvas.onpointerup=canvas.onpointercancel=()=>{dragX=null;};
+// Planar results carry joint angles only; place them in the Z=0 plane of the 3D world.
+function planarArm(q){const elbow=[.34*Math.cos(q[0]),1.4+.34*Math.sin(q[0]),0];return {elbow,hand:[elbow[0]+.29*Math.cos(q[0]+q[1]),elbow[1]+.29*Math.sin(q[0]+q[1]),0]};}
+function armPoints(f){return f.elbow&&f.hand?{elbow:f.elbow,hand:f.hand}:planarArm(f.q);}
+function targetPoints(f){return f.target_elbow&&f.target_hand?{elbow:f.target_elbow,hand:f.target_hand}:planarArm(f.target);}
+let stage=null,pathSource=null;
+try{stage=createStage($('stage'));}catch(e){$('view-label').textContent=e.message;}
+function syncPath(){const frames=exported?replayFrames:result?.frames;if(!stage||frames===pathSource)return;pathSource=frames;stage.setPath(frames?.map(f=>armPoints(f).hand),exported);}
 
 function draw(now){const dt=Math.min((now-previous)/1000,.1);previous=now;if(result&&playing)cursor=(cursor+dt)%current.duration;
-  const rect=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;const w=rect.width,h=rect.height;if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
-  const scale=Math.min(h/2.25,w/1.7),ox=w*.32,oy=h*.91;
-  const point=(x,y,z=0)=>[ox+(x*Math.cos(cameraYaw)+z*Math.sin(cameraYaw))*scale,oy-y*scale];
-  function line(a,b,color,width=2,dash=[]){ctx.beginPath();ctx.setLineDash(dash);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.moveTo(...point(...a));ctx.lineTo(...point(...b));ctx.stroke();ctx.setLineDash([]);}
-  function circle(x,y,r,color){ctx.beginPath();ctx.arc(...point(x,y),r*scale,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();}
-  for(let x=-1;x<2;x+=.2)line([x,0],[x,2.1],'#2e3d3e',.5);for(let y=0;y<2.2;y+=.2)line([-1,y],[2,y],'#2e3d3e',.5);
-  line([-1,0],[2,0],'#637672',1);line([0,0],[0,1.4],'#71837a',8,[3,5]);line([-.15,0],[.15,0],'#92a49a',8);
-  // Context silhouette is fixed scenery, not an additional simulated body.
-  line([-.12,1.4],[-.12,.8],'#3d5353',25);circle(-.12,1.7,.12,'#526765');line([-.12,.8],[-.25,.14],'#3d5353',14);line([-.12,.8],[.03,.14],'#3d5353',14);
-  if(current?.obstacle){const a=point(.395,1.77);ctx.fillStyle='#bc794945';ctx.strokeStyle='#d7945b';ctx.lineWidth=1.5;ctx.fillRect(a[0],a[1],.15*scale,.24*scale);ctx.strokeRect(a[0],a[1],.15*scale,.24*scale);}
+  let state={obstacle:current?.obstacle??$('obstacle').checked,actual:null,target:null};
   if(result){const frames=exported?replayFrames:result.frames;const f=sampleFrames(frames,cursor);const original=sampleFrames(result.frames,cursor);
     if(videoURL){
       const video=$('source-video');let sourceTime=null;
@@ -110,16 +106,12 @@ function draw(now){const dt=Math.min((now-previous)/1000,.1);previous=now;if(res
         $('sync-status').textContent='Matched source '+video.currentTime.toFixed(2)+' s / animation '+cursor.toFixed(2)+' s'+(video.seeking?' / seeking':'');
       }else{$('sync-status').textContent=video.error?'Source video cannot be decoded; use a browser-compatible recording':video.readyState<1?'Loading source video':hashingVideo?'Checking source hash':!activeCapture?'Apply a captured animation':videoHash!==activeCapture.provenance.video_sha256?'Source mismatch: playback is not synchronized':'No source time map: playback is not synchronized';}
     }
-    function arm(q,color,width,dash=[]){const elbow=[.34*Math.cos(q[0]),1.4+.34*Math.sin(q[0])];const hand=[elbow[0]+.29*Math.cos(q[0]+q[1]),elbow[1]+.29*Math.sin(q[0]+q[1])];line([0,1.4],elbow,color,width,dash);line(elbow,hand,color,width*.8,dash);if(!dash.length){circle(...elbow,.044,'#e1f6dc');circle(...hand,.044,color);}return hand;}
-    let hand;
-    if(result.rig==='spatial_arm_v1'){
-      line([0,1.4,0],original.target_elbow,'#9eafaa80',3,[6,6]);line(original.target_elbow,original.target_hand,'#9eafaa80',3,[6,6]);
-      const color=exported?'#aacbff':'#b8f4b2';line([0,1.4,0],f.elbow,color,15);line(f.elbow,f.hand,color,12);hand=f.hand;
-    }else{arm(original.target,'#9eafaa80',3,[6,6]);hand=arm(f.q,exported?'#aacbff':'#b8f4b2',15);}
-    circle(0,1.4,.055,'#e4e8cf');
-    ctx.fillStyle='#c2d1c9';ctx.font='11px Segoe UI';ctx.fillText(exported?'EXPORTED MOTION':original.contacts?'CONTACT':'REACH',point(...hand)[0]+18,point(...hand)[1]);
+    state={obstacle:!!current.obstacle,actual:armPoints(f),target:targetPoints(original),replay:exported,contact:!exported&&!!original.contacts,
+      label:exported?'EXPORTED MOTION':original.contacts?'CONTACT':'REACH'};
     $('timeline').value=cursor/current.duration;$('time').textContent=cursor.toFixed(2)+' / '+current.duration.toFixed(2)+' s';
-  }requestAnimationFrame(draw);
+  }
+  if(stage){syncPath();stage.render(state);}
+  requestAnimationFrame(draw);
 }
 requestAnimationFrame(draw);
 fetch('/api/status').then(r=>r.json()).then(s=>{$('meta-status').textContent='Muse Spark · '+s.meta;}).catch(e=>{$('meta-status').textContent=e.message;});

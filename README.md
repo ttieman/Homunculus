@@ -29,6 +29,11 @@ python -m venv .venv
 
 Open **http://127.0.0.1:8765**. On Linux, substitute `.venv/bin/python`.
 
+The viewport is a WebGL 3D scene: drag to orbit, scroll to zoom, right-drag to
+pan, double-click to reset. three.js is vendored as `web/vendor/three.js`, so the
+editor runs offline; after changing `web/vendor/three-entry.js`, rebuild it with
+`npm ci && npm run build:three`.
+
 ```powershell
 .venv/Scripts/python.exe -m pytest -q
 .venv/Scripts/python.exe measure.py

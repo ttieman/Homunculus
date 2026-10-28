@@ -56,3 +56,19 @@ test('mismatched source cannot apply the capture',async({page})=>{
   await page.getByRole('button',{name:'Use captured motion',exact:true}).click();
   await expect(page.locator('#capture-status')).toContainText('mismatch');
 });
+
+test('3D stage renders with WebGL and orbits',async({page})=>{
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');
+  await expect(page.locator('#stage')).toHaveAttribute('data-renderer','webgl');
+  await expect(page.locator('#time')).toContainText('/ 4.00 s');
+  await page.getByRole('button',{name:'Pause playback'}).click();
+  const stage=page.locator('#stage');
+  const before=await stage.screenshot();
+  const box=await stage.boundingBox();
+  await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();
+  await page.mouse.move(box.x+box.width/2+160,box.y+box.height/2+30,{steps:8});await page.mouse.up();
+  await page.waitForTimeout(400);
+  expect(Buffer.compare(before,await stage.screenshot())).not.toBe(0);
+  expect(errors).toEqual([]);
+});

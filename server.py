@@ -36,7 +36,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200,{'max_document_bytes':MAX_DOCUMENT_BYTES})
         if self.path == '/api/status':
             return self.send(200,{'meta': 'configured; unverified' if configured_key() else 'blocked: no credentials', 'model':MODEL})
-        paths = {'/':('index.html','text/html; charset=utf-8'), '/app.js':('app.js','text/javascript; charset=utf-8')}
+        js = 'text/javascript; charset=utf-8'
+        paths = {'/':('index.html','text/html; charset=utf-8'), '/app.js':('app.js',js),
+                 '/stage3d.js':('stage3d.js',js), '/vendor/three.js':('vendor/three.js',js)}
         if self.path not in paths:
             return self.send(404,{'error':'Not found'})
         name, mime = paths[self.path]
