@@ -6,7 +6,7 @@ import json
 import os
 from puppet import Edit, run
 from exporter import export_gltf
-from meta import propose, MODEL
+from meta import propose, MODEL, configured_key
 from motion import prepare
 
 ROOT = Path(__file__).parent
@@ -31,7 +31,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.local():
             return self.send(403,{'error':'Local origin required'})
         if self.path == '/api/status':
-            return self.send(200,{'meta': 'configured; unverified' if os.environ.get('MODEL_API_KEY') else 'blocked: no credentials', 'model':MODEL})
+            return self.send(200,{'meta': 'configured; unverified' if configured_key() else 'blocked: no credentials', 'model':MODEL})
         paths = {'/':('index.html','text/html; charset=utf-8'), '/app.js':('app.js','text/javascript; charset=utf-8')}
         if self.path not in paths:
             return self.send(404,{'error':'Not found'})

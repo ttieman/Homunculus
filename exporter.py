@@ -5,6 +5,7 @@ import math
 
 
 def export_gltf(result):
+    side = 'L' if (result.get('capture') or {}).get('provenance',{}).get('side')=='left' else 'R'
     binary = bytearray()
     views, accessors = [], []
 
@@ -33,9 +34,9 @@ def export_gltf(result):
     return {'asset': {'version': '2.0', 'generator': 'Force Puppet'},
             'scene': 0, 'scenes': [{'nodes': [0,5]}],
             'nodes': [
-                {'name':'shoulder.R','translation':[0,1.4,0],'children':[1,3]},
-                {'name':'elbow.R','translation':[.34,0,0],'children':[2,4]},
-                {'name':'hand.R','translation':[.29,0,0]},
+                {'name':'shoulder.'+side,'translation':[0,1.4,0],'children':[1,3]},
+                {'name':'elbow.'+side,'translation':[.34,0,0],'children':[2,4]},
+                {'name':'hand.'+side,'translation':[.29,0,0]},
                 {'name':'upper_arm_mesh','mesh':0,'translation':[.17,0,0],'scale':[.17,.04,.04]},
                 {'name':'forearm_mesh','mesh':0,'translation':[.145,0,0],'scale':[.145,.03,.03]},
                 {'name':'visible_shoulder_support','mesh':0,'translation':[0,.7,0],'scale':[.035,.7,.035]}],

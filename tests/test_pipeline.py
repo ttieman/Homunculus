@@ -59,7 +59,7 @@ def test_invalid_edits(values):
 
 
 def test_missing_meta_is_explicit(monkeypatch):
-    monkeypatch.delenv('MODEL_API_KEY',raising=False)
+    monkeypatch.setattr('meta.configured_key',lambda: '')
     with pytest.raises(RuntimeError,match='BLOCKED'):
         propose('slower',Edit())
 

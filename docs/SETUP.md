@@ -64,3 +64,5 @@ baseline. Keep any source recording private unless explicitly approved for publi
 For full-body work, reproduce PHC or MaskedMimic in its documented original
 runtime first. Current conventional arm results are not evidence that whole-body
 balance, learned-policy portability or game integration works.
+
+Local key setup: create .env.local beside server.py containing MODEL_API_KEY= followed by your Meta key. This ignored file is read only for configuration and inference; its contents are never served to the browser. Environment configuration takes precedence. Never commit or paste keys into chat.
