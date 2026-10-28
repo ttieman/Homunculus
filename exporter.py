@@ -50,26 +50,53 @@ def export_gltf(result):
                       'note':'Rigid articulated arm; no skin or game-skeleton retargeting. Obstacle is not exported.'}}
 
 
-def replay_gltf(document):
-    """Independent buffer decode + quaternion FK; never reads source q or hand samples."""
-    blob = base64.b64decode(document['buffers'][0]['uri'].split(',',1)[1])
-    def read(index, width):
-        acc = document['accessors'][index]
-        view = document['bufferViews'][acc['bufferView']]
-        values = struct.unpack_from('<'+'f'*(acc['count']*width), blob, view.get('byteOffset',0)+acc.get('byteOffset',0))
-        return [values[i:i+width] for i in range(0,len(values),width)]
-    anim = document['animations'][0]
-    rotations = [read(s['output'],4) for s in anim['samplers']]
+def animation_tracks(document):
+    """Validate this exporter's rig contract, times, channels and rotation buffers."""
     import numpy as np
+    try:
+        blob=base64.b64decode(document['buffers'][0]['uri'].split(',',1)[1],validate=True)
+        def read(index,width,kind):
+            acc=document['accessors'][index]; view=document['bufferViews'][acc['bufferView']]
+            if acc['type']!=kind or acc['componentType']!=5126 or acc['count']<2 or view['buffer']!=0:
+                raise ValueError('Invalid animation accessor')
+            size=acc['count']*width*4;offset=view.get('byteOffset',0)+acc.get('byteOffset',0)
+            if size>view['byteLength'] or offset+size>len(blob): raise ValueError('Truncated animation buffer')
+            return np.array(struct.unpack_from('<'+'f'*(acc['count']*width),blob,offset)).reshape(-1,width)
+        anim=document['animations'][0]
+        if len(anim['channels'])!=2 or len(anim['samplers'])!=2: raise ValueError('Expected two arm tracks')
+        tracks={}; times=None
+        for channel in anim['channels']:
+            node=channel['target']['node']
+            if node not in (0,1) or node in tracks or channel['target']['path']!='rotation': raise ValueError('Unexpected animation channel')
+            sampler=anim['samplers'][channel['sampler']]
+            if sampler['interpolation']!='LINEAR': raise ValueError('Unsupported interpolation')
+            t=read(sampler['input'],1,'SCALAR')[:,0];q=read(sampler['output'],4,'VEC4')
+            if len(t)!=len(q) or not np.isfinite(t).all() or t[0]!=0 or np.any(np.diff(t)<=0): raise ValueError('Invalid animation times')
+            if not np.isfinite(q).all() or not np.allclose(np.linalg.norm(q,axis=1),1,atol=1e-5): raise ValueError('Invalid rotation track')
+            if times is not None and not np.array_equal(times,t): raise ValueError('Arm tracks have different timestamps')
+            times=t;tracks[node]=q
+        if 1 not in document['nodes'][0]['children'] or 2 not in document['nodes'][1]['children']: raise ValueError('Unexpected rig hierarchy')
+        return times,[tracks[0],tracks[1]]
+    except (KeyError,IndexError,TypeError,struct.error) as exc:
+        raise ValueError('Malformed glTF animation') from exc
+
+
+def replay_gltf(document, sample_times=None):
+    """Independent buffer decode, timed SLERP and FK; never reads source samples."""
+    import numpy as np
+    from timeline import slerp
+    times,rotations=animation_tracks(document)
     def rotation(q):
         x,y,z,w=q
         return np.array([[1-2*(y*y+z*z),2*(x*y-z*w),2*(x*z+y*w)],
                          [2*(x*y+z*w),1-2*(x*x+z*z),2*(y*z-x*w)],
                          [2*(x*z-y*w),2*(y*z+x*w),1-2*(x*x+y*y)]])
     hands=[]
-    for a,b in zip(*rotations):
-        root=np.array(document['nodes'][0]['translation'])
-        upper=np.array(document['nodes'][1]['translation'])
-        fore=np.array(document['nodes'][2]['translation'])
+    for time in times if sample_times is None else sample_times:
+        if not np.isfinite(time): raise ValueError('Invalid replay time')
+        time=np.clip(time,times[0],times[-1]);i=min(max(np.searchsorted(times,time,side='right')-1,0),len(times)-2)
+        u=(time-times[i])/(times[i+1]-times[i])
+        a,b=[slerp(track[i,[3,0,1,2]],track[i+1,[3,0,1,2]],u)[[1,2,3,0]] for track in rotations]
+        root=np.array(document['nodes'][0]['translation']);upper=np.array(document['nodes'][1]['translation']);fore=np.array(document['nodes'][2]['translation'])
         hands.append((root+rotation(a)@upper+rotation(a)@rotation(b)@fore).tolist())
     return hands

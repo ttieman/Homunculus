@@ -1,8 +1,9 @@
 # Model integration policies
 
 Checked 2026-10-26/27. These are implementation proposals, not model benchmarks.
-The user confirmed access is not configured. No live inference or weight download
-has occurred. Public catalog availability, account access and event eligibility are
+The proposals below preserve the original dated research. Current status is in
+[STATUS.md](STATUS.md): SAM inference and weight download have occurred; Spark
+adapters are implemented, but live API verification is still pending. Public catalog availability, account access and event eligibility are
 independent. No hosted model subscription or paid infrastructure was purchased.
 
 ## Shared contract and evaluation rules
@@ -14,7 +15,7 @@ torques into the simulator. Unsupported/ambiguous requests ask for refinement;
 refusals, timeouts, malformed outputs and missing access leave state unchanged.
 Never substitute fixtures for real inference. Fixtures only test adapters.
 
-The selected editor contract is `Edit`: duration seconds [2,10], shoulder degrees
+The selected editor contract is `Edit`: duration seconds [2,30], shoulder degrees
 [5,100], elbow degrees [-100,30], strength [.1,2], damping [.2,3], obstacle boolean.
 All numbers must be finite. These are complete-clip controls, not regional edits.
 Use manual controls as ground truth for the equivalent language operations.
@@ -25,7 +26,7 @@ corrections and cost. Initial adoption target: >=18/20 correct, zero unsafe
 applications, p95 <=10 seconds. These are workflow targets, NOT measured claims.
 Any latency estimate below is a testing budget, not observed model speed.
 
-## 1. Muse Spark — RECOMMEND (medium confidence, access blocked)
+## 1. Muse Spark — IMPLEMENTED ADAPTERS (live evaluation pending)
 
 - **Problem/capability:** typed direction -> previewable control changes.
 - **Evidence:** official catalog documents tool use; animation-edit quality is a hypothesis.
@@ -96,7 +97,7 @@ Any latency estimate below is a testing budget, not observed model speed.
 - **Experiment/adoption:** shared 20 cases, 2-hour test after access; adopt only on demonstrated cost/privacy/control benefit at comparable quality.
 - **Dependencies:** provider credentials, checkpoint license and event open-weight wording. Exact checkpoint/provider ID unresolved; no download or claimed performance.
 
-## 8. SAM 3D Body — EXPERIMENT (medium, weights blocked)
+## 8. SAM 3D Body — OPERATIONAL EXPERIMENT (accuracy unmeasured)
 
 - **Problem/capability:** personal performance -> per-frame body observations usable for motion processing.
 - **Evidence/hypothesis:** body reconstruction and MHR representation documented; temporal stability and target-rig mapping remain hypotheses.

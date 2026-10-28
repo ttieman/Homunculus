@@ -3,8 +3,9 @@
 The implemented path is an offline worker plus a capture importer. Video selected
 in the editor stays local to the browser; it is not automatically uploaded to SAM
 or sent to the compute box. The worker must be run separately with approved
-weights. Live inference has NOT RUN: weights and a user-owned source clip are
-still missing. Synthetic tests exercise conversion, simulation and export only.
+weights. Real SAM inference has been demonstrated; see SYNTHESIS.md for the
+dated measured experiment. Automated tests use synthetic observations and do
+not measure model accuracy. Current contracts are summarized in STATUS.md.
 
 ## Record a useful first take
 
@@ -41,7 +42,8 @@ The worker loads SAM once, uses the explicit crop, samples decoded presentation
 timestamps, and calls `process_one_image(..., inference_type='body')`. Missing or
 nonmonotonic decoder timestamps fail explicitly; no constant-FPS guess replaces
 them. Input timestamps are retained even when the clip begins partway through
-the video. GPU fit and speed on the 12 GB worker remain unmeasured.
+the video. The measured 12 GB worker run is documented in SYNTHESIS.md. Current sampling
+uses a fixed source-time grid with achieved/requested rates recorded separately.
 
 Outputs:
 
@@ -69,10 +71,10 @@ telemetry remain in the bundle. Default FOV is labelled uncalibrated.
    capture provenance and the actual physical outcome.
 
 The shoulder/elbow pose sliders are disabled for captures because the recording
-owns those targets. Spark editing is currently limited to the procedural demo;
-we do not send a capture to an adapter that cannot express trajectory edits.
+owns those targets. Spatial captures support reviewed structured timing proposals from Spark.
+Live model behavior still requires a configured key and separate evaluation.
 
-## Validation policy
+## Original planar validation policy
 
 2–10 seconds, 3–601 samples, increasing timestamps, finite nondegenerate segments,
 proper orthonormal basis. First and last poses must exist. Gaps longer than 250 ms
@@ -98,4 +100,9 @@ that wrist indices follow the COCO layout. It saves raw output before retargetin
 
 ## Spatial motion and longer clips
 
-Use --spatial for the explicit 3D arm path (2.1–30 seconds). Run synthesize.py locally on its capture.json. See [SYNTHESIS.md](SYNTHESIS.md) for editing, optimization and artifact contracts. The original planar path retains its stricter geometric limits.
+Use --spatial for the explicit 3D arm path (2.1–30 seconds, up to 901 frames). The
+worker supports 5–30 Hz; both importer and timeline share the 901-frame budget.
+The browser/server document limit is 8 MiB. Edited and duration-scaled spatial
+references are checked for angular speeds above 720 degrees/second. Discontinuous
+hold transitions are rejected for physics. A held pose must be duplicated before
+a separate transition. Equivalent quaternion signs map to the same hinge angle. Run synthesize.py locally on its capture.json. See [SYNTHESIS.md](SYNTHESIS.md) for editing, optimization and artifact contracts. The original planar path retains its stricter geometric limits.

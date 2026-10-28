@@ -7,3 +7,6 @@ __pycache__/
 outputs/
 private/
 *.log
+node_modules/
+test-results/
+playwright-report/

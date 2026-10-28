@@ -21,10 +21,8 @@ def main():
     error=float(np.max(np.abs(np.asarray(replay_gltf(gltf))-np.array([f['hand'] for f in result['frames']]))))
     if error>1e-6: raise RuntimeError('Export transform verification failed')
     report.update(export_max_component_error_m=error,capture=motion.metadata)
-    args.output.mkdir(parents=True)
-    for name,value in [('capture.json',bundle),('animation.gltf',gltf),('simulation.json',result),('synthesis-report.json',report),
-                       ('reference-animation.json',motion.timeline.document),('motion-profile.json',{'schema':'homunculus.motion-profile.v1','skeletonId':'homunculus.supported-arm.v1','reference':'reference-animation.json','trajectory':'simulation.json','export':'animation.gltf','controller':{'type':'PD+bias','version':1,'parameters':result['edit'],'torque_limits_Nm':[35,35,35,20]},'physics':{'root':'fixed','lengths_m':[.34,.29],'masses_kg':[1.4,.9],'timestep_s':.002,'gravity':[0,-9.81,0],'engine':'MuJoCo '+result['metrics']['mujoco']},'validation':{'export_verified':True,'full_body':False,'generalization':'not tested'},'optimization':report})]:
-        (args.output/name).write_text(json.dumps(value,indent=2,allow_nan=False),encoding='utf-8')
+    from assets import save_asset
+    save_asset(args.output,bundle,motion,result,report)
     print(json.dumps({'output':str(args.output),'selected':report['selected'],'metrics':result['metrics'],'export_error_m':error},indent=2))
 
 

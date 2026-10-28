@@ -11,3 +11,12 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m pytest -q
       - run: python measure.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=size=160x90:rate=10 -t 3 -c:v libvpx-vp9 -pix_fmt yuv420p -y outputs/browser-fixture.webm
+      - run: PYTHONPATH=.:tests python tests/browser_fixture.py
+      - run: npm run test:browser

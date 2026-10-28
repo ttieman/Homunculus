@@ -6,8 +6,10 @@ import json
 import os
 from puppet import Edit, run
 from exporter import export_gltf
-from meta import propose, MODEL, configured_key
+from meta import propose, propose_reference, MODEL, configured_key
 from motion import prepare
+
+from contracts import MAX_DOCUMENT_BYTES, object_value
 
 ROOT = Path(__file__).parent
 
@@ -30,6 +32,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.local():
             return self.send(403,{'error':'Local origin required'})
+        if self.path == '/api/contracts':
+            return self.send(200,{'max_document_bytes':MAX_DOCUMENT_BYTES})
         if self.path == '/api/status':
             return self.send(200,{'meta': 'configured; unverified' if configured_key() else 'blocked: no credentials', 'model':MODEL})
         paths = {'/':('index.html','text/html; charset=utf-8'), '/app.js':('app.js','text/javascript; charset=utf-8')}
@@ -43,9 +47,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(403,{'error':'Local origin required'})
         try:
             size = int(self.headers.get('Content-Length','0'))
-            if not 0 < size <= 524288:
-                raise ValueError('Request size must be 1–524288 bytes')
-            body = json.loads(self.rfile.read(size))
+            if not 0 < size <= MAX_DOCUMENT_BYTES:
+                raise ValueError(f'Request size must be 1–{MAX_DOCUMENT_BYTES} bytes')
+            body = object_value(json.loads(self.rfile.read(size)),'request')
             if self.path == '/api/capture/validate':
                 motion = prepare(body['capture'])
                 return self.send(200,{'metadata':motion.metadata})
@@ -60,6 +64,7 @@ class Handler(BaseHTTPRequestHandler):
                     keys=doc['keyframes']; doc['keyframes']=[keys[0],keys[len(keys)//2],keys[-1]]
                     ids={k['poseId'] for k in doc['keyframes']};doc['poses']={k:v for k,v in doc['poses'].items() if k in ids}
                     timeline=Timeline(doc)
+                if body.get('duration') is not None: timeline=timeline.edited([{'operation':'set_duration','parameters':{'seconds':body['duration']}}])
                 if body.get('commands'): timeline=timeline.edited(body['commands'])
                 capture=body['capture'];capture['reference_animation']=timeline.document
                 prepare(capture)
@@ -76,9 +81,9 @@ class Handler(BaseHTTPRequestHandler):
                     result = run(edit,motion)
                 return self.send(200,{'result':result,'gltf':export_gltf(result)})
             if self.path == '/api/propose':
-                return self.send(200,propose(body['prompt'],edit))
+                return self.send(200,propose_reference(body['prompt'],body['capture'],edit) if body.get('capture') is not None else propose(body['prompt'],edit))
             self.send(404,{'error':'Not found'})
-        except (ValueError,KeyError,TypeError) as exc:
+        except (ValueError,KeyError,TypeError,AttributeError,IndexError,OverflowError,RecursionError) as exc:
             self.send(400,{'error':str(exc)})
         except RuntimeError as exc:
             self.send(503,{'error':str(exc)})

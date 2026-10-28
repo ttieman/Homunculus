@@ -1,5 +1,9 @@
 # Motion synthesis — 2026-10-27
 
+Historical first-synthesis report. Subsequent inspection fixes and current contracts
+are described in [STATUS.md](STATUS.md); the measurements below belong to the
+original recorded experiment, not an automatic rerun after every change.
+
 ## Audit and selected scope
 
 Existing modules are retained: `capture_video.py` owns offline SAM inference;

@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from contracts import MAX_FRAMES, SampleGrid
 
 
 def sha256(path):
@@ -36,6 +37,8 @@ def main():
     args=p.parse_args()
     if not 2.1<=args.seconds<=(30 if args.spatial else 10) or not 5<=args.sample_hz<=30 or not args.start>=0:
         p.error('Use 2.1–10 seconds, 5–30 Hz and a nonnegative start')
+    if int(args.seconds*args.sample_hz)+1 > MAX_FRAMES:
+        p.error(f'Capture exceeds {MAX_FRAMES} frame budget')
     for name in ('video','checkpoint','mhr'):
         if not getattr(args,name).is_file(): p.error(f'BLOCKED: {name} file unavailable')
     if args.output.exists(): p.error('Output already exists; choose a new directory')
@@ -57,7 +60,8 @@ def main():
     indices=[mhr_names.index(f'{args.side}-{part}') for part in ('shoulder','elbow','wrist')]
     video=cv2.VideoCapture(str(args.video))
     if not video.isOpened(): p.error('Cannot decode input video')
-    records=[];last_t=-1;next_t=args.start;frame_index=0;started=time.perf_counter()
+    image_size=[int(video.get(cv2.CAP_PROP_FRAME_WIDTH)),int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))]
+    records=[];last_t=-1;grid=SampleGrid(args.start,args.sample_hz);frame_index=0;started=time.perf_counter()
     try:
         while True:
             ok,bgr=video.read()
@@ -67,9 +71,8 @@ def main():
                 raise ValueError('Decoder did not preserve strictly increasing timestamps; transcode/inspect video first')
             last_t=t
             if t>args.start+args.seconds: break
-            if t+1e-8<next_t:
+            if not grid.take(t):
                 frame_index+=1;continue
-            next_t=t+1/args.sample_hz
             h,w=bgr.shape[:2];x1,y1,x2,y2=args.bbox
             if not (0<=x1<x2<=w and 0<=y1<y2<=h): raise ValueError('Bounding box outside decoded image')
             output=estimator.process_one_image(cv2.cvtColor(bgr,cv2.COLOR_BGR2RGB),
@@ -95,8 +98,11 @@ def main():
         'provenance':{'kind':'sam3d','model':'SAM 3D Body supplied checkpoint','revision':revision,
             'checkpoint_sha256':sha256(args.checkpoint),'mhr_sha256':sha256(args.mhr),
             'video_sha256':sha256(args.video),'side':args.side,'bbox':args.bbox,
+            'image_size_px':image_size,
             'identity':'user-selected single-person fixed ROI; no automatic identity tracking',
             'native_units':'unverified; directions only','camera':'default FOV; not metric calibration',
+            'requested_sample_hz':args.sample_hz,
+            'achieved_sample_hz':(len(records)-1)/(records[-1]['t']-records[0]['t']) if len(records)>1 else 0,
             'wall_s':time.perf_counter()-started,'torch':torch.__version__,
             'peak_cuda_allocated_bytes':torch.cuda.max_memory_allocated()}}
     (args.output/'capture.json').write_text(json.dumps(bundle,indent=2,allow_nan=False),encoding='utf-8')

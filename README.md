@@ -16,6 +16,9 @@ there are no fabricated model responses. SAM 3D Body has processed an owned vide
 This is not yet the complete
 Meta-powered product, a full-body controller, or a game-ready retargeted clip.
 
+See [current capabilities and contracts](docs/STATUS.md) for spatial limits,
+asset replay and quality-evaluation boundaries.
+
 ## Run
 
 ```powershell

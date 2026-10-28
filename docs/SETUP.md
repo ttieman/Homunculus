@@ -25,12 +25,14 @@ results and the in-memory edit audit; importing saved sessions is not implemente
 
 Obtain access through the official [Meta dashboard](https://dev.meta.ai/).
 Set `MODEL_API_KEY` in the process environment before starting the server. Avoid
-placing keys in source, screenshots, chat, shell history or public issues. No
-credential file is needed. Restart the server after changing its environment.
+placing keys in source, screenshots, chat, shell history or public issues. Alternatively place MODEL_API_KEY=your_key in the ignored .env.local file; it
+is read on demand. Restart only after changing process environment variables.
 
 The implemented adapter uses `muse-spark-1.3` at
 `https://api.meta.ai/v1/chat/completions`. It sends only the direction and current
-controls, and expects one `propose_edit` tool call. Example: “Make this six seconds
+controls for procedural edits (`propose_edit`). Spatial captures use
+`edit_timeline` with key IDs, times and interpolation modes; no raw poses or
+video are sent by that adapter. Example: “Make this six seconds
 long and reduce strength to 0.4.” Review its complete proposed controls before
 applying. It cannot yet edit a time interval, load a reference video or direct a
 full-body rig. Unsupported requests should be rejected, not approximated silently.
@@ -41,28 +43,30 @@ latency and semantic accuracy remain BLOCKED/UNVERIFIED.
 
 ## Compute worker
 
-The existing Linux worker has a 12 GB RTX 2060 and a working SSH connection.
-The running inference service occupied ~11 GB and was actively processing during
-inspection. User authorized takeover **after current work completes**. No service
-was stopped or disabled. Determine job-level completion, not just a momentary idle
-slot, before reallocating its GPU. Keep local connection details out of this public repo.
+SAM 3D Body inference has run successfully on the existing 12 GB Linux GPU worker.
+Use its isolated approved environment and checkpoints; do not reinstall or stop
+unrelated jobs as part of routine setup. The first takeover was explicitly
+requested by the user. Credentials and connection details remain local.
 
-Once free, create an isolated environment for SAM 3D Body, obtain approved weights,
-record exact revisions and run its original single-image example first. Do not
-download large optional stacks or interrupt other services merely to prepare this
-baseline. Keep any source recording private unless explicitly approved for publication.
+The worker needs capture_video.py, motion.py and contracts.py together. Install
+these from the same revision. Use --spatial for 3D arm observations. The worker
+and editor use separate Python environments; see CAPTURE.md and STATUS.md.
 
-## Next bounded experiment
+## Reusable motion assets
 
-1. Configure Spark and run the 20-case authoring evaluation in MODEL_POLICIES.md.
-2. Request SAM 3D Body weight access. After worker completion, run a known image,
-   then a short owned reach clip; inspect raw MHR outputs before retargeting.
-3. Map one arm chain, documenting rest frames and scale, then compare captured
-   versus synthetic input under the same controller.
-4. Retarget/bake to the actual game skeleton and test Bevy playback separately.
+Run `python synthesize.py private/capture.json --output private/new-asset`.
+The version-2 motion-profile.json references checksummed capture, reference,
+physics, trajectory, glTF and optimization files. `python assets.py private/new-asset`
+reloads the recorded configuration and compares reproduced positions and torques.
+Do not edit linked files in place without regenerating the asset manifest.
 
-For full-body work, reproduce PHC or MaskedMimic in its documented original
-runtime first. Current conventional arm results are not evidence that whole-body
-balance, learned-policy portability or game integration works.
+Save reference produces an editable capture wrapper for the browser importer.
+Save session is an audit download; browser session import is not implemented.
+Neither a successful profile replay nor low tracking error measures capture accuracy.
 
-Local key setup: create .env.local beside server.py containing MODEL_API_KEY= followed by your Meta key. This ignored file is read only for configuration and inference; its contents are never served to the browser. Environment configuration takes precedence. Never commit or paste keys into chat.
+## Next experiments
+
+Supply a local Meta key and run live timing-edit evaluation. Add independently
+annotated observations for capture-quality evaluation. Full-body crouching,
+ground contacts, balance, perturbation recovery and game rig mapping remain
+separate research milestones, not prerequisites for supported-arm authoring.
