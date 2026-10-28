@@ -72,3 +72,20 @@ test('3D stage renders with WebGL and orbits',async({page})=>{
   expect(Buffer.compare(before,await stage.screenshot())).not.toBe(0);
   expect(errors).toEqual([]);
 });
+
+test('configured character is posed, exported and replayed',async({page})=>{
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');
+  await expect(page.locator('#stage')).toHaveAttribute('data-character','loaded');
+  await expect(page.locator('#character-note')).toContainText('test-character.glb');
+  await expect(page.getByRole('button',{name:'Export character GLB',exact:true})).toBeEnabled();
+  const downloadPromise=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Export character GLB',exact:true}).click();
+  const file=await (await downloadPromise).path();
+  expect((await fs.readFile(file)).subarray(0,4).toString()).toBe('glTF');
+  await page.getByLabel('Show physics arm').check();
+  await page.getByRole('button',{name:'Replay export',exact:true}).click();
+  await expect(page.locator('#view-label')).toContainText('character clip');
+  await page.waitForTimeout(300);
+  expect(errors).toEqual([]);
+});

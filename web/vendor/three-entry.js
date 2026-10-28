@@ -5,6 +5,7 @@ export {
   Float32BufferAttribute, CapsuleGeometry, TubeGeometry, CatmullRomCurve3, SphereGeometry, CylinderGeometry, BoxGeometry, CircleGeometry,
   EdgesGeometry, MeshStandardMaterial, MeshBasicMaterial, LineBasicMaterial, LineDashedMaterial,
   ShadowMaterial, HemisphereLight, DirectionalLight, GridHelper, Vector3, Quaternion, Color,
-  PCFShadowMap, SRGBColorSpace, DoubleSide,
+  PCFShadowMap, SRGBColorSpace, DoubleSide, AnimationMixer, LoopOnce,
 } from 'three';
 export { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+export { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';

@@ -68,6 +68,9 @@ export function createStage(canvas) {
   Object.assign(key.shadow.camera, {left: -2, right: 2, top: 2, bottom: -2, near: .5, far: 10});
   key.shadow.bias = -.0005;
   scene.add(key);
+  const rim = new THREE.DirectionalLight(0xa9c8ff, 1.6); // separates dark characters from the background
+  rim.position.set(-2.2, 2.6, -2.4);
+  scene.add(rim);
 
   // Floor: a grid for scale plus an invisible plane that only shows shadows.
   const grid = new THREE.GridHelper(4, 20, 0x4b5e5c, 0x2e3d3e);
@@ -146,8 +149,54 @@ export function createStage(canvas) {
     }
   }
 
+  // Optional game character (served by the local server; never bundled in this repo).
+  const loader = new THREE.GLTFLoader();
+  const character = {root: null, bones: {}, side: null, mixer: null, action: null};
+  const sceneryBody = [torso, head, hipL, hipR, shoulderBar];
+  const clean = name => name.replace(/[\[\]\.:\/]/g, ''); // GLTFLoader strips these from node names
+  const bone = (name, side) => character.bones[clean(`${name}.${side}`)];
+  const handWorld = new THREE.Vector3();
+  function placeCharacter(side) {
+    if (!character.root || character.side === side) return;
+    character.side = side;
+    // Character faces +Z; puppet +X is its forward, puppet +Z its captured side (mirror for the left arm).
+    character.root.position.set(0, 0, 0);
+    character.root.rotation.set(0, Math.PI / 2, 0);
+    character.root.scale.set(side === 'L' ? -1 : 1, 1, 1);
+    character.root.updateMatrixWorld(true);
+    const shoulder = bone('upper_arm', side).getWorldPosition(new THREE.Vector3());
+    character.root.position.set(-shoulder.x, 0, -shoulder.z); // shoulders share the vertical axis; feet stay on the floor
+  }
+
   const projected = new THREE.Vector3();
   return {
+    async loadCharacter(url) {
+      const gltf = await loader.loadAsync(url);
+      character.root = new THREE.Group();
+      character.root.add(gltf.scene);
+      gltf.scene.traverse(o => {
+        if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; }
+        if (o.name) character.bones[o.name] = o;
+      });
+      for (const s of 'LR') for (const b of ['upper_arm', 'forearm', 'hand'])
+        if (!bone(b, s)) throw new Error(`Character is missing ${b}.${s}`);
+      character.mixer = new THREE.AnimationMixer(gltf.scene);
+      scene.add(character.root);
+      for (const p of sceneryBody) p.visible = false;
+      armMat.transparent = true; armMat.opacity = .3; armMat.depthWrite = false;
+      placeCharacter('R');
+      canvas.dataset.character = 'loaded';
+    },
+    get hasCharacter() { return !!character.root; },
+    async setReplayClip(buffer) {
+      if (!character.root) return;
+      character.action?.stop(); character.action = null;
+      if (!buffer) return;
+      const gltf = await loader.parseAsync(buffer, '');
+      if (!gltf.animations.length) throw new Error('Exported character has no animation');
+      character.action = character.mixer.clipAction(gltf.animations[0]);
+      character.action.play();
+    },
     setPath(points, replay = false) {
       path.geometry.dispose();
       const pts = (points || []).map(p => new THREE.Vector3(...p));
@@ -162,7 +211,11 @@ export function createStage(canvas) {
       obstacle.visible = !!state.obstacle;
       obstacleMat.emissive.setHex(state.contact ? 0x6a2e08 : 0x000000);
       const arm = state.actual, target = state.target;
-      for (const p of armParts) p.visible = !!arm;
+      const proxy = !!arm && (!character.root || !state.character || state.showPhysics);
+      for (const p of armParts) p.visible = proxy;
+      post.visible = base.visible = shoulderJoint.visible = !character.root?.visible || proxy;
+      path.material.opacity = proxy || !character.root?.visible ? .45 : .25;
+      drop.visible = shadowDot.visible = !!arm;
       if (arm) {
         const shoulder = SHOULDER.toArray();
         armMat.color.setHex(state.replay ? COLORS.replay : COLORS.sim);
@@ -173,14 +226,34 @@ export function createStage(canvas) {
         drop.computeLineDistances();
         shadowDot.position.set(arm.hand[0], .003, arm.hand[2]);
       }
-      if (target) {
+      if (target && proxy) {
         place(targetUpper, SHOULDER.toArray(), target.elbow); place(targetFore, target.elbow, target.hand);
         targetHand.position.fromArray(target.hand);
       } else { targetUpper.visible = targetFore.visible = targetHand.visible = false; }
+      if (!proxy) upper.visible = fore.visible = false; // place() re-shows segments it positions
+      if (character.root) {
+        const pose = state.character;
+        character.root.visible = !!pose;
+        if (pose) {
+          placeCharacter(pose.side);
+          if (pose.replayTime != null && character.action) {
+            character.mixer.setTime(pose.replayTime);
+          } else if (pose.rotations) {
+            bone('upper_arm', pose.side).quaternion.fromArray(pose.rotations[0]);
+            bone('forearm', pose.side).quaternion.fromArray(pose.rotations[1]);
+          }
+          character.root.updateMatrixWorld(true);
+          bone('hand', pose.side).getWorldPosition(handWorld);
+          const pos = drop.geometry.attributes.position;
+          pos.setXYZ(0, handWorld.x, handWorld.y, handWorld.z); pos.setXYZ(1, handWorld.x, .002, handWorld.z); pos.needsUpdate = true;
+          drop.computeLineDistances();
+          shadowDot.position.set(handWorld.x, .003, handWorld.z);
+        }
+      }
       controls.update();
       renderer.render(scene, camera);
       if (arm && state.label) {
-        projected.fromArray(arm.hand).project(camera);
+        projected.copy(character.root?.visible && !proxy ? handWorld : tmpA.fromArray(arm.hand)).project(camera);
         const visible = projected.z < 1;
         label.hidden = !visible;
         label.textContent = state.label;

@@ -19,4 +19,5 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=size=160x90:rate=10 -t 3 -c:v libvpx-vp9 -pix_fmt yuv420p -y outputs/browser-fixture.webm
       - run: PYTHONPATH=.:tests python tests/browser_fixture.py
+      - run: python tests/character_fixture.py
       - run: npm run test:browser

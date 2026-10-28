@@ -12,7 +12,8 @@ remain historical evidence, not a claim that every research stage is complete.
 | Optimization | Current setting plus bounded PD sweep, explicit feasibility | Same clip; bounded joint-impulse replay tested, no generalization claim |
 | Asset persistence | Checksummed v2 profiles with recorded XML and replay CLI | Exact MuJoCo version and supported arm rig |
 | Browser comparison | Matching source video, source-time map, common animation transport | Seek latency is shown; no fake frame-perfect claim |
-| Export | Timed quaternion replay and Khronos validator check | Rigid arm, no external game rig retargeting |
+| Export | Timed quaternion replay and Khronos validator check | Rigid arm glTF |
+| Character retarget | Arm directions onto an external stickman-contract GLB; viewer pose, GLB clip export, three.js replay | Directions only: no IK to contacts, rest body pose, other clips dropped; Bevy playback not yet tested |
 | Capture quality | Diagnostics and optional annotated 2D-landmark evaluation | No invented confidence; calibrated 3D accuracy unmeasured |
 
 Spatial inputs: 2–30 seconds, 3–901 frames, observation gaps <=250 ms, finite

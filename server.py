@@ -10,11 +10,14 @@ from meta import propose, propose_reference, MODEL, configured_key
 from motion import prepare
 
 from contracts import MAX_DOCUMENT_BYTES, object_value
+import character
 
 ROOT = Path(__file__).parent
 
 
 class Handler(BaseHTTPRequestHandler):
+    rig = None  # optional external character (see character.py)
+
     def send(self, status, data, content_type='application/json'):
         encoded = json.dumps(data,allow_nan=False).encode() if content_type=='application/json' else data
         self.send_response(status)
@@ -35,7 +38,11 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == '/api/contracts':
             return self.send(200,{'max_document_bytes':MAX_DOCUMENT_BYTES})
         if self.path == '/api/status':
-            return self.send(200,{'meta': 'configured; unverified' if configured_key() else 'blocked: no credentials', 'model':MODEL})
+            return self.send(200,{'meta': 'configured; unverified' if configured_key() else 'blocked: no credentials', 'model':MODEL,
+                                  'character': self.rig.summary() if self.rig else None})
+        if self.path == '/character.glb':
+            if not self.rig: return self.send(404,{'error':'No character configured'})
+            return self.send(200,self.rig.blob,'model/gltf-binary')
         js = 'text/javascript; charset=utf-8'
         paths = {'/':('index.html','text/html; charset=utf-8'), '/app.js':('app.js',js),
                  '/stage3d.js':('stage3d.js',js), '/vendor/three.js':('vendor/three.js',js)}
@@ -81,7 +88,12 @@ class Handler(BaseHTTPRequestHandler):
                     result['optimization']=report
                 else:
                     result = run(edit,motion)
-                return self.send(200,{'result':result,'gltf':export_gltf(result)})
+                payload={'result':result,'gltf':export_gltf(result)}
+                if self.rig:
+                    result['retarget']=character.retarget(result,self.rig)
+                    payload['character_glb']=character.b64(character.export_character_glb(self.rig,result['retarget'],
+                        {'provenance':result['source'],'edit':result['edit'],'capture':result.get('capture')}))
+                return self.send(200,payload)
             if self.path == '/api/propose':
                 return self.send(200,propose_reference(body['prompt'],body['capture'],edit) if body.get('capture') is not None else propose(body['prompt'],edit))
             self.send(404,{'error':'Not found'})
@@ -94,6 +106,11 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port',type=int,default=8765)
+    parser.add_argument('--character',help='GLB game character to retarget onto (default: HOMUNCULUS_CHARACTER in the environment or .env.local)')
     args = parser.parse_args()
+    path = args.character or character.configured_path()
+    if path:
+        Handler.rig = character.load_rig(path)
+        print(f'Character: {Handler.rig.source} ({Handler.rig.summary()["mapping"]})',flush=True)
     print(f'Force Puppet: http://127.0.0.1:{args.port}',flush=True)
     ThreadingHTTPServer(('127.0.0.1',args.port),Handler).serve_forever()

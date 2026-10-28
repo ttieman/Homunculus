@@ -34,6 +34,25 @@ pan, double-click to reset. three.js is vendored as `web/vendor/three.js`, so th
 editor runs offline; after changing `web/vendor/three-entry.js`, rebuild it with
 `npm ci && npm run build:three`.
 
+### Your game character
+
+Point the server at a GLB character and the editor poses it with the result, and
+**Export character GLB** writes that character with a `Homunculus_Reach` clip
+on its own skeleton (its other clips are left out). The file stays where it is;
+it is never copied into this repository. Put this in the ignored `.env.local`:
+
+```
+HOMUNCULUS_CHARACTER=C:\path\to\bevy-playground\assets\characters\stickman\stickman.glb
+```
+
+or pass `--character <path>` to `server.py`. The rig needs the Bevy-playground
+stickman contract: one skin, +Y up, facing +Z, bones along local +Y and
+`shoulder/upper_arm/forearm/hand.L|R`. Physics arm +X becomes the character's
+forward and +Z points out from the captured side. Only arm directions transfer;
+the character keeps its own (shorter) proportions and rest body pose, so its hand
+can stop short of where the physics hand touched. Tick **Show physics arm** to
+compare. See `character.py` for the exact conventions.
+
 ```powershell
 .venv/Scripts/python.exe -m pytest -q
 .venv/Scripts/python.exe measure.py
