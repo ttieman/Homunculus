@@ -28,7 +28,7 @@ export function createWorkspace(app) {
   };
   async function perform(name,args={},source='manual') {
     if(executing||app.busy())throw Error('Another operation is still running');
-    executing=true;let before;
+    executing=true;$('undo').disabled=true;$('redo').disabled=true;let before;
     try{
       await app.validate(name,args);if(!handlers[name])throw Error('Command is not implemented');
       before=snapshot();const value=await handlers[name](args);
@@ -38,7 +38,7 @@ export function createWorkspace(app) {
       if(name!=='inspect_workspace')revision++;
       $('undo').disabled=!undo.length;$('redo').disabled=!redo.length;
       return {ok:true,command:name,source,result:value??{status:'Applied'},revision};
-    }catch(error){throw error;}finally{executing=false;}
+    }catch(error){throw error;}finally{executing=false;$('undo').disabled=app.busy()||!undo.length;$('redo').disabled=app.busy()||!redo.length;}
   }
   function manual(name,args={}){return perform(name,args).catch(e=>{$('message').textContent=e.message;throw e;});}
   function bind(id,name,args=()=>({})){$(id).onclick=()=>manual(name,args()).catch(()=>{});}

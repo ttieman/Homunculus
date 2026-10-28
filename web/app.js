@@ -19,7 +19,7 @@ async function simulate(edit,source='manual',remember=true,capture=activeCapture
   try{const view=$('character-view').value;const payload=await api(optimize?'/api/synthesize':'/api/simulate',{edit,capture,...(view==='auto'?{}:{view})});if(remember)redoHistory=[];if(remember&&current)history.push(structuredClone({edit:current,capture:activeCapture}));
     edit=payload.result.edit;current=edit;activeCapture=capture;result=payload.result;gltf=payload.gltf;characterGlb=payload.character_glb||null;cursor=0;exported=false;replayFrames=null;stage?.setReplayClip(null);$('export-character').disabled=!characterGlb;proposal=null;$('accept').hidden=true;$('proposal').textContent='';
     $('shoulder_deg').disabled=!!capture;$('elbow_deg').disabled=!!capture;
-    $('source-note').textContent=capture?'Imported '+capture.provenance.kind+' arm motion · Fixed shoulder · Recorded angles own the pose; duration, strength and damping remain editable. Language edits can change timing; new poses and forces are not supported.':'Original procedural reference · MuJoCo torque control · Fixed shoulder. Arm-to-character retargeting is available; full-body balance is not included.';
+    $('source-note').textContent=capture?'Imported '+capture.provenance.kind+' arm motion · Fixed shoulder · Recorded angles own the pose; duration, strength and damping remain editable. Muse can edit timing and bounded joint-local pose corrections; full-body poses and forces are not supported.':'Original procedural reference · MuJoCo torque control · Fixed shoulder. Arm-to-character retargeting is available; full-body balance is not included.';
     audit.push({source,edit:structuredClone(edit),at:new Date().toISOString()});fill(edit);
     $('error').textContent=result.metrics.tracking_rmse_deg.toFixed(2)+'°';$('contact').textContent=result.metrics.contact_steps;
     $('speed').textContent=Math.round(result.metrics.simulation_wall_s*1000)+' ms';
@@ -157,7 +157,7 @@ const workspace=createWorkspace({
   useCapture:async capture=>{
     await api('/api/capture/validate',{capture});
     if(hashingVideo)throw Error('Wait for source video hashing');
-    if(videoHash&&capture.provenance.video_sha256!==videoHash)throw Error('Capture does not match the selected source video');
+    if(videoHash&&capture.provenance.video_sha256!==videoHash)throw Error('Source video mismatch: capture does not match the selected video');
     const frames=capture.frames,duration=capture.reference_animation?.keyframes.at(-1).time??frames.at(-1).t-frames[0].t;
     if(capture.retargeting==='spatial_arm_v1')capture=(await api('/api/reference',{capture,duration})).capture;
     await requireSimulation({...fields(),duration,obstacle:false},capture);return {status:'Captured motion applied',duration};
@@ -191,6 +191,6 @@ const workspace=createWorkspace({
     adjust_pose:async args=>{if(!activeCapture)throw Error('Load a spatial capture first');const payload=await api('/api/pose',{capture:activeCapture,...args});await requireSimulation(current,payload.capture);return {status:'Pose adjusted',keyId:args.keyId};}
   }
 });
-$('edit-key').onclick=async()=>{try{const p=await api('/api/reference',{capture:activeCapture,duration:current.duration});const k=p.reference.keyframes[Number($('key-index').value)-1];if(!k)throw Error('Invalid key number');await workspace.manual('edit_timeline',{commands:[{operation:'move_keyframe',targetId:k.id,parameters:{time:Number($('key-time').value)}},{operation:'set_interpolation',targetId:k.id,parameters:{interpolation:$('key-curve').value}}]});}catch(e){$('message').textContent=e.message;}};
-$('adjust-pose').onclick=async()=>{try{const p=await api('/api/reference',{capture:activeCapture});const k=p.reference.keyframes[Number($('key-index').value)-1];if(!k)throw Error('Invalid key number');await workspace.manual('adjust_pose',{keyId:k.id,joint:$('pose-joint').value,axis:$('pose-axis').value,degrees:Number($('pose-angle').value)});}catch(e){$('message').textContent=e.message;}};
-$('use-capture').onclick=async()=>{if(!pendingCapture||!$('review-capture').checked)return;try{const file=new File([JSON.stringify(pendingCapture)],'reviewed-capture.json',{type:'application/json'});const item=await workspace.attach(file);await workspace.manual('use_attachment',{id:item.id});}catch(e){$('message').textContent=e.message;}};
+$('edit-key').onclick=async()=>{try{const k=activeCapture?.reference_animation?.keyframes[Number($('key-index').value)-1];if(!k)throw Error('Invalid key number');await workspace.manual('edit_timeline',{commands:[{operation:'move_keyframe',targetId:k.id,parameters:{time:Number($('key-time').value)}},{operation:'set_interpolation',targetId:k.id,parameters:{interpolation:$('key-curve').value}}]});}catch(e){$('message').textContent=e.message;}};
+$('adjust-pose').onclick=async()=>{try{const k=activeCapture?.reference_animation?.keyframes[Number($('key-index').value)-1];if(!k)throw Error('Invalid key number');await workspace.manual('adjust_pose',{keyId:k.id,joint:$('pose-joint').value,axis:$('pose-axis').value,degrees:Number($('pose-angle').value)});}catch(e){$('message').textContent=e.message;}};
+$('use-capture').onclick=async()=>{if(!pendingCapture||!$('review-capture').checked)return;try{const file=new File([JSON.stringify(pendingCapture)],'reviewed-capture.json',{type:'application/json'});const item=await workspace.attach(file);await workspace.manual('use_attachment',{id:item.id});}catch(e){$('message').textContent=e.message;$('capture-status').textContent=e.message;}};
