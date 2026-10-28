@@ -46,7 +46,7 @@ def replay_asset(directory):
         if digest(raw)!=sha: raise ValueError(f'Asset hash mismatch: {name}')
         data[name]=json.loads(raw)
     capture=data['capture.json'];capture['reference_animation']=data['reference-animation.json']
-    result=run_spatial(Edit.parse(profile['controller']['parameters']),prepare_spatial(capture),physics=data['physics.json'])
+    result=run_spatial(Edit.parse(profile['controller']['parameters']),prepare_spatial(capture),physics=data['physics.json'],disturbance=data['simulation.json'].get('disturbance'))
     if result['physics_sha256']!=profile['physics_sha256']: raise ValueError('Physics configuration mismatch')
     old=data['simulation.json']['frames'];new=result['frames']
     if len(old)!=len(new): raise ValueError('Replay frame count mismatch')

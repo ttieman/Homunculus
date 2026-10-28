@@ -99,13 +99,12 @@ Any latency estimate below is a testing budget, not observed model speed.
 
 ## 8. SAM 3D Body — OPERATIONAL EXPERIMENT (accuracy unmeasured)
 
-- **Problem/capability:** personal performance -> per-frame body observations usable for motion processing.
-- **Evidence/hypothesis:** body reconstruction and MHR representation documented; temporal stability and target-rig mapping remain hypotheses.
-- **Options:** official `facebook/sam-3d-body-dinov3` first candidate, `facebook/sam-3d-body-vith` alternative; inspect Kinesia's temporal adapters before reuse. Synthetic reach remains a labelled control experiment.
-- **I/O:** approved frame/time/identity -> native pose/joints with explicit source frame and calibration. Preserve raw outputs before normalizing to RH Y-up metres; unknown scale stays unknown.
-- **Execution/authority/failure:** offline Linux job after gated access and current GPU work finishes. Flag missing/occluded frames; don't invent confidence. Cannot claim recovered human forces or direct MHR-to-game compatibility.
-- **Experiment/adoption:** 3-second stationary-camera full-visibility reach, then occlusion; inspect joint mapping, jitter and missing frames independently of physical tracking. One-day estimated setup/test budget, actual runtime/VRAM unknown. Require correct rest pose/left-right/bend mapping and a usable reviewed clip before integrating.
-- **Dependencies:** HF approval/auth, Python/PyTorch/Detectron2 and model/MHR terms, source-video rights. Exact weight commit pending download. Eligibility UNKNOWN; not explicitly named on event page, absence is not prohibition. User confirms access not configured.
+- **Capability:** image/video pose estimates supply spatial-arm reference motion.
+- **Selected implementation:** approved DINOv3 checkpoint and MHR asset in the isolated Linux runtime; fixed user-reviewed person crop; named MHR70 shoulder/elbow/wrist keypoints; full numeric output retained privately.
+- **Authority:** estimated directions only. Default camera is uncalibrated; body proportions and root are normalized to the supported rig. No ground-truth human forces or direct MHR-to-game rotation equivalence is claimed.
+- **Measured evidence:** one owned 14.55-second capture, 195 observations in the original sampler, 161.65-second worker time excluding model load, 3.79 GB peak allocated GPU memory. See SYNTHESIS.md for revision, warnings and scope. Subsequent sampler fixes are regression-tested separately.
+- **Remaining evaluation:** independently annotated clear, sideways, cropped and occluded examples; separate reconstruction accuracy, cleanup error, controller tracking and export fidelity. Quality tooling is implemented but no calibrated accuracy benchmark is claimed.
+- **Dependencies/status:** approved weights and runtime are operational. Licenses remain separate from project MIT licensing. No weights or private recording are redistributed. Contest qualification remains unresolved; successful technical use is not organizer approval.
 
 ## 9. SAM 3D Objects — DEFER (high)
 

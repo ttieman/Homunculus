@@ -9,7 +9,7 @@ remain historical evidence, not a claim that every research stage is complete.
 | Spatial pose/timeline | Implemented | Fixed proportions, bend-plane twist convention |
 | Timeline editing | Manual and validated Meta proposal adapter | Live Meta response pending local key |
 | Physics | Supported spatial arm and original planar arm | No full-body ground/balance controller |
-| Optimization | Current setting plus bounded PD sweep, explicit feasibility | Same clip, no generalization claim |
+| Optimization | Current setting plus bounded PD sweep, explicit feasibility | Same clip; bounded joint-impulse replay tested, no generalization claim |
 | Asset persistence | Checksummed v2 profiles with recorded XML and replay CLI | Exact MuJoCo version and supported arm rig |
 | Browser comparison | Matching source video, source-time map, common animation transport | Seek latency is shown; no fake frame-perfect claim |
 | Export | Timed quaternion replay and Khronos validator check | Rigid arm, no external game rig retargeting |

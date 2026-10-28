@@ -45,6 +45,19 @@ def test_spatial_telemetry_effort_and_repeatability():
     assert 'xml' in a['physics_configuration']
 
 
+def test_bounded_disturbance_is_measurable_reproducible_and_recorded(tmp_path):
+    b=bundle();m=prepare_spatial(b);edit=Edit(duration=3,obstacle=False)
+    clean=run_spatial(edit,m)
+    disturbance={'time_s':.6,'joint_impulse_Nms':[0,.05,0,0]}
+    perturbed=run_spatial(edit,m,disturbance=disturbance)
+    assert clean['frames'][0]==perturbed['frames'][0]
+    assert np.max(np.abs(np.array([f['hand'] for f in clean['frames']])-[f['hand'] for f in perturbed['frames']]))>1e-5
+    assert any(any(f['external_torque_Nm']) for f in perturbed['frames'])
+    assert np.all(np.array(perturbed['metrics']['peak_torque_Nm'])<=[35,35,35,20])
+    directory=tmp_path/'disturbed';save_asset(directory,b,m,perturbed,{})
+    assert replay_asset(directory)['passed']
+
+
 @pytest.mark.parametrize('operation',['valid','unsupported','unsafe'])
 def test_timeline_model_adapter_validates_without_sending_poses(monkeypatch,operation):
     b=bundle();original=copy.deepcopy(b)
