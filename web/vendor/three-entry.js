@@ -4,7 +4,7 @@ export {
   WebGLRenderer, Scene, PerspectiveCamera, Group, Mesh, Line, LineSegments, BufferGeometry,
   Float32BufferAttribute, CapsuleGeometry, TubeGeometry, CatmullRomCurve3, SphereGeometry, CylinderGeometry, BoxGeometry, CircleGeometry,
   EdgesGeometry, MeshStandardMaterial, MeshBasicMaterial, LineBasicMaterial, LineDashedMaterial,
-  ShadowMaterial, HemisphereLight, DirectionalLight, GridHelper, Vector3, Quaternion, Color,
+  ShadowMaterial, HemisphereLight, DirectionalLight, GridHelper, Vector3, Quaternion, Color, Matrix4,
   PCFShadowMap, SRGBColorSpace, DoubleSide, AnimationMixer, LoopOnce,
 } from 'three';
 export { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';

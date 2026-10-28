@@ -15,7 +15,7 @@ async function api(path,data){const r=await fetch(path,{method:'POST',headers:{'
 function lock(value){busy=value;for(const id of ['apply','undo','redo','propose','accept','use-fixture','capture-file','video-file'])$(id).disabled=value; $('undo').disabled=value||!history.length; $('redo').disabled=value||!redoHistory.length; for(const id of ['optimize','three-poses','save-reference','edit-key'])$(id).disabled=value||activeCapture?.retargeting!=='spatial_arm_v1'; $('propose').disabled=value||(!!activeCapture&&activeCapture.retargeting!=='spatial_arm_v1');$('video-file').disabled=value||hashingVideo;$('use-capture').disabled=value||hashingVideo||!pendingCapture||!$('review-capture').checked;}
 async function simulate(edit,source='manual',remember=true,capture=activeCapture,optimize=false){
   if(busy)return;lock(true);$('message').textContent='Simulating physical response…';
-  try{const payload=await api(optimize?'/api/synthesize':'/api/simulate',{edit,capture});if(remember)redoHistory=[];if(remember&&current)history.push(structuredClone({edit:current,capture:activeCapture}));
+  try{const view=$('character-view').value;const payload=await api(optimize?'/api/synthesize':'/api/simulate',{edit,capture,...(view==='auto'?{}:{view})});if(remember)redoHistory=[];if(remember&&current)history.push(structuredClone({edit:current,capture:activeCapture}));
     edit=payload.result.edit;current=edit;activeCapture=capture;result=payload.result;gltf=payload.gltf;characterGlb=payload.character_glb||null;cursor=0;exported=false;replayFrames=null;stage?.setReplayClip(null);$('export-character').disabled=!characterGlb;proposal=null;$('accept').hidden=true;$('proposal').textContent='';
     $('shoulder_deg').disabled=!!capture;$('elbow_deg').disabled=!!capture;
     $('source-note').textContent=capture?'Imported '+capture.provenance.kind+' arm motion · Fixed shoulder · Recorded angles own the pose; duration, strength and damping remain editable. Language edits can change timing; new poses and forces are not supported.':'Original procedural reference · MuJoCo torque control · Fixed shoulder. Full-body balance and game retargeting are not included.';
@@ -71,6 +71,7 @@ $('use-capture').onclick=async()=>{if(!pendingCapture||!$('review-capture').chec
   const frames=pendingCapture.frames;const duration=pendingCapture.reference_animation?.keyframes.at(-1).time??(frames.at(-1).t-frames[0].t);
   await simulate({...fields(),duration:duration,obstacle:false},'imported capture',true,pendingCapture);
 };
+$('character-view').onchange=()=>{if(current&&!busy)simulate(current,'recording view',false,activeCapture);};
 $('use-fixture').onclick=()=>simulate(fields(),'procedural fixture',true,null);
 function readAccessor(doc,index,width){const a=doc.accessors[index],v=doc.bufferViews[a.bufferView];const bytes=Uint8Array.from(atob(doc.buffers[v.buffer].uri.split(',')[1]),c=>c.charCodeAt(0));const view=new DataView(bytes.buffer);return Array.from({length:a.count},(_,i)=>Array.from({length:width},(_,j)=>view.getFloat32((v.byteOffset||0)+(a.byteOffset||0)+(i*width+j)*4,true)));}
 $('replay').onclick=()=>{if(!gltf)return;exported=!exported;if(exported){const samplers=gltf.animations[0].samplers;const tracks=samplers.map(s=>readAccessor(gltf,s.output,4));const times=readAccessor(gltf,samplers[0].input,1);replayFrames=times.map((t,i)=>({t:t[0],rotations:tracks.map(track=>track[i]),q:tracks.map(track=>2*Math.atan2(track[i][2],track[i][3])),...quaternionArm(tracks.map(track=>track[i]))}));}
@@ -112,7 +113,7 @@ function draw(now){const dt=Math.min((now-previous)/1000,.1);previous=now;if(res
     }
     state={obstacle:!!current.obstacle,actual:armPoints(f),target:targetPoints(original),replay:exported,contact:!exported&&!!original.contacts,
       label:exported?'EXPORTED MOTION':original.contacts?'CONTACT':'REACH',
-      showPhysics:$('show-physics').checked,character:result.retarget?{side:result.retarget.side,rotations:sampleRig(result.retarget.frames,cursor),replayTime:exported?cursor:null}:null};
+      showPhysics:$('show-physics').checked,character:result.retarget?{side:result.retarget.side,toPuppet:result.retarget.character_to_puppet,rotations:sampleRig(result.retarget.frames,cursor),replayTime:exported?cursor:null}:null};
     $('timeline').value=cursor/current.duration;$('time').textContent=cursor.toFixed(2)+' / '+current.duration.toFixed(2)+' s';
   }
   if(stage){syncPath();stage.render(state);}
@@ -120,5 +121,5 @@ function draw(now){const dt=Math.min((now-previous)/1000,.1);previous=now;if(res
 }
 requestAnimationFrame(draw);
 fetch('/api/status').then(r=>r.json()).then(s=>{$('meta-status').textContent='Muse Spark · '+s.meta;
-  if(s.character&&stage){$('export-character').hidden=false;$('physics-toggle').hidden=false;stage.loadCharacter('/character.glb').then(()=>{$('character-note').textContent='Character: '+s.character.source+' · arm directions retargeted ('+s.character.mapping+'). Proportions differ from the physics arm, shown faintly.';}).catch(e=>{$('character-note').textContent='Character failed to load: '+e.message;});}}).catch(e=>{$('meta-status').textContent=e.message;});
+  if(s.character&&stage){$('export-character').hidden=false;$('physics-toggle').hidden=false;$('view-toggle').hidden=false;stage.loadCharacter('/character.glb').then(()=>{$('character-note').textContent='Character: '+s.character.source+' · arm directions retargeted; its own proportions are kept (tick Show physics arm to compare).';}).catch(e=>{$('character-note').textContent='Character failed to load: '+e.message;});}}).catch(e=>{$('meta-status').textContent=e.message;});
 simulate(fields(),'initial procedural fixture',false);

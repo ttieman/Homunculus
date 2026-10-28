@@ -156,13 +156,17 @@ export function createStage(canvas) {
   const clean = name => name.replace(/[\[\]\.:\/]/g, ''); // GLTFLoader strips these from node names
   const bone = (name, side) => character.bones[clean(`${name}.${side}`)];
   const handWorld = new THREE.Vector3();
-  function placeCharacter(side) {
-    if (!character.root || character.side === side) return;
-    character.side = side;
-    // Character faces +Z; puppet +X is its forward, puppet +Z its captured side (mirror for the left arm).
+  const placement = new THREE.Matrix4();
+  function placeCharacter(side, toPuppet) {
+    const key = side + JSON.stringify(toPuppet);
+    if (!character.root || character.key === key) return;
+    character.key = key;
+    // toPuppet (row-major 3x3, from the server's retarget) maps character axes into the puppet/camera frame;
+    // it may be a mirror for side-on left arms, which decompose() turns into a negative X scale.
+    const m = toPuppet || [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+    placement.set(m[0][0], m[0][1], m[0][2], 0, m[1][0], m[1][1], m[1][2], 0, m[2][0], m[2][1], m[2][2], 0, 0, 0, 0, 1);
+    placement.decompose(character.root.position, character.root.quaternion, character.root.scale);
     character.root.position.set(0, 0, 0);
-    character.root.rotation.set(0, Math.PI / 2, 0);
-    character.root.scale.set(side === 'L' ? -1 : 1, 1, 1);
     character.root.updateMatrixWorld(true);
     const shoulder = bone('upper_arm', side).getWorldPosition(new THREE.Vector3());
     character.root.position.set(-shoulder.x, 0, -shoulder.z); // shoulders share the vertical axis; feet stay on the floor
@@ -184,7 +188,7 @@ export function createStage(canvas) {
       scene.add(character.root);
       for (const p of sceneryBody) p.visible = false;
       armMat.transparent = true; armMat.opacity = .3; armMat.depthWrite = false;
-      placeCharacter('R');
+      placeCharacter('R', null);
       canvas.dataset.character = 'loaded';
     },
     get hasCharacter() { return !!character.root; },
@@ -235,7 +239,7 @@ export function createStage(canvas) {
         const pose = state.character;
         character.root.visible = !!pose;
         if (pose) {
-          placeCharacter(pose.side);
+          placeCharacter(pose.side, pose.toPuppet);
           if (pose.replayTime != null && character.action) {
             character.mixer.setTime(pose.replayTime);
           } else if (pose.rotations) {

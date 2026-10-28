@@ -90,7 +90,9 @@ class Handler(BaseHTTPRequestHandler):
                     result = run(edit,motion)
                 payload={'result':result,'gltf':export_gltf(result)}
                 if self.rig:
-                    result['retarget']=character.retarget(result,self.rig)
+                    view=body.get('view')
+                    if view is not None and view not in character.VIEWS: raise ValueError('view must be one of '+', '.join(sorted(character.VIEWS)))
+                    result['retarget']=character.retarget(result,self.rig,view=view)
                     payload['character_glb']=character.b64(character.export_character_glb(self.rig,result['retarget'],
                         {'provenance':result['source'],'edit':result['edit'],'capture':result.get('capture')}))
                 return self.send(200,payload)
@@ -111,6 +113,6 @@ if __name__ == '__main__':
     path = args.character or character.configured_path()
     if path:
         Handler.rig = character.load_rig(path)
-        print(f'Character: {Handler.rig.source} ({Handler.rig.summary()["mapping"]})',flush=True)
+        print(f'Character: {Handler.rig.source}',flush=True)
     print(f'Force Puppet: http://127.0.0.1:{args.port}',flush=True)
     ThreadingHTTPServer(('127.0.0.1',args.port),Handler).serve_forever()

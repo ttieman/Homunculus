@@ -7,9 +7,14 @@ Rig contract (the Bevy-playground stickman): glTF 2.0 binary, one skin, Y-up,
 character faces +Z, bones point along local +Y, and these names exist per side:
 shoulder.L/R -> upper_arm.L/R -> forearm.L/R -> hand.L/R.
 
-Mapping from the puppet frame (X reach, Y up, Z toward camera) to the character:
-puppet +X is the character's forward (+Z), puppet +Z points away from the body on
-the captured side, Y stays up. Only segment directions transfer; the character
+The puppet frame is the camera frame (X image-right, Y up, Z toward the camera), so
+the mapping depends on how the person stood in the recording (VIEWS):
+- front: the person faces the camera. Identity: image-right is the character's
+  left (+X), toward-camera is its forward (+Z). Default for 3D (spatial) captures.
+- side: side-on reach. Puppet +X (the reach) is the character's forward and +Z
+  points away from the body on the captured side. Default for planar captures and
+  the procedural demo, which are side-on by construction.
+Only segment directions transfer; the character
 keeps its own proportions. The upper-arm roll is chosen so the elbow bends about
 the upper arm's local X axis (the rig's hinge); with a straight arm the previous
 bend plane is kept. The rest of the body stays in its rest pose.
@@ -149,7 +154,7 @@ class Rig:
                        'upper_arm_m': round(float(np.linalg.norm(self.local(f)[0])), 4),
                        'forearm_m': round(float(np.linalg.norm(self.local(h)[0])), 4)}
         return {'source': self.source, 'bytes': len(self.blob), 'arms': side,
-                'mapping': 'puppet +X -> character forward (+Z); puppet +Z -> outward on captured side; +Y up'}
+                'views': VIEWS}
 
 
 def load_rig(path):
@@ -175,10 +180,26 @@ def side_of(result):
     return 'L' if (result.get('capture') or {}).get('provenance', {}).get('side') == 'left' else 'R'
 
 
-def to_character(v, side):
+VIEWS = {'front': 'person faces the camera: image-right -> character left (+X), toward camera -> forward (+Z)',
+         'side': 'side-on: puppet +X reach -> character forward (+Z), puppet +Z -> outward on the captured side'}
+
+
+def default_view(result):
+    return 'front' if result.get('rig') == 'spatial_arm_v1' else 'side'
+
+
+def mapping(side, view):
+    """3x3 matrix M with character = M @ puppet (a rotation, or a mirror for side-on left arms)."""
+    if view == 'front':
+        return np.eye(3)
+    if view != 'side':
+        raise ValueError(f'Unknown recording view {view!r}; use one of {sorted(VIEWS)}')
+    return np.array([[0, 0, 1 if side == 'L' else -1], [0, 1, 0], [1, 0, 0]], dtype=float)
+
+
+def to_character(v, side, view='side'):
     """Puppet direction -> character direction (see module docstring)."""
-    x, y, z = v
-    return np.array([z if side == 'L' else -z, y, x], dtype=float)
+    return mapping(side, view) @ np.asarray(v, dtype=float)
 
 
 def puppet_arm(frame):
@@ -196,8 +217,10 @@ def unit(v, what):
     return v / n
 
 
-def retarget(result, rig, side=None):
+def retarget(result, rig, side=None, view=None):
     side = side or side_of(result)
+    view = view or default_view(result)
+    to_char = mapping(side, view)
     shoulder, upper, fore = (rig.index(f'{b}.{side}') for b in CHAIN[:3])
     shoulder_world = rig.rest_world(shoulder)[1]
     inv_shoulder = qinv(shoulder_world)
@@ -205,8 +228,8 @@ def retarget(result, rig, side=None):
     directions = []
     for frame in result['frames']:
         elbow, hand = puppet_arm(frame)
-        directions.append((unit(to_character(elbow - root, side), 'upper arm'),
-                           unit(to_character(hand - elbow, side), 'forearm')))
+        directions.append((unit(to_char @ (elbow - root), 'upper arm'),
+                           unit(to_char @ (hand - elbow), 'forearm')))
     # Seed the bend plane from the first visibly bent frame (else the most bent one; rest +Z if never bent).
     bend = qmat(rig.rest_world(upper)[1])[:, 2]
     perpendiculars = [d2 - np.dot(d2, d1) * d1 for d1, d2 in directions]
@@ -237,7 +260,8 @@ def retarget(result, rig, side=None):
         frames.append({'t': float(frame['t']), 'rotations_xyzw': [local_upper.tolist(), local_fore.tolist()]})
     return {'schema': 'homunculus.retarget.v1', 'character': rig.source, 'side': side,
             'bones': [rig.document['nodes'][upper]['name'], rig.document['nodes'][fore]['name']],
-            'nodes': [upper, fore], 'mapping': rig.summary()['mapping'],
+            'nodes': [upper, fore], 'view': view, 'mapping': VIEWS[view],
+            'character_to_puppet': to_char.T.tolist(),
             'note': 'Arm segment directions only; character proportions and rest body pose are kept.',
             'frames': frames}
 
@@ -324,7 +348,7 @@ def export_character_glb(rig, retargeted, extras=None):
     doc['bufferViews'] = views
     doc['accessors'] = accessors
     doc['extras'] = {'homunculus': {'side': retargeted['side'], 'bones': retargeted['bones'],
-                                    'mapping': retargeted['mapping'], 'note': retargeted['note'],
+                                    'view': retargeted['view'], 'mapping': retargeted['mapping'], 'note': retargeted['note'],
                                     **(extras or {})}}
     return write_glb(doc, binary)
 

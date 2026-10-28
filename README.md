@@ -47,8 +47,10 @@ HOMUNCULUS_CHARACTER=C:\path\to\bevy-playground\assets\characters\stickman\stick
 
 or pass `--character <path>` to `server.py`. The rig needs the Bevy-playground
 stickman contract: one skin, +Y up, facing +Z, bones along local +Y and
-`shoulder/upper_arm/forearm/hand.L|R`. Physics arm +X becomes the character's
-forward and +Z points out from the captured side. Only arm directions transfer;
+`shoulder/upper_arm/forearm/hand.L|R`. The recording view decides the axes:
+**facing camera** (default for 3D captures) keeps camera right/up/toward as the
+character's left/up/forward; **side-on** (planar captures and the demo) makes the
+reach direction the character's forward. Override it with **Recording view**. Only arm directions transfer;
 the character keeps its own (shorter) proportions and rest body pose, so its hand
 can stop short of where the physics hand touched. Tick **Show physics arm** to
 compare. See `character.py` for the exact conventions.
