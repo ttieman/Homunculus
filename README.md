@@ -83,3 +83,10 @@ No free-standing balance or human muscle-force reconstruction is claimed.
 Source code uses this repository's existing MIT license. MuJoCo, model weights,
 datasets and any future third-party rigs retain their own terms. No private game
 assets, source recordings, credentials or model weights are included.
+
+### Muse workspace tools
+
+Use **Direct the workspace** to chat, attach image/video/capture/scene files,
+and run validated app actions. The **Command inspector** exposes the exact
+same tools for manual testing. Scene props are visual only; offline SAM jobs
+remain separate. [Architecture, review and limitations](docs/MUSE_WORKSPACE.md).

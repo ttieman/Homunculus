@@ -44,3 +44,11 @@ Annotation schema: homunculus.annotations.v1, matching video_sha256, and frames
 with t, condition and arm_pixels (three [x,y] points; null means unlabelled).
 Use clear, sideways, occluded and cropped examples. Fixture tests prove arithmetic,
 not SAM accuracy. A real independently annotated benchmark remains to be collected.
+
+## Workspace tools (2026-10-28)
+
+The 3D character branch now has a shared validated command interface for Muse
+and manual controls: scene setup, playback, media attachments, exports,
+undo/redo, timeline editing and bounded local pose corrections. See
+[Muse workspace architecture and review](MUSE_WORKSPACE.md). Live model access
+and new worker video runs remain separate verification steps.
