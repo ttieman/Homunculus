@@ -64,7 +64,7 @@ async function loadVideo(f){if(!f)return;
 $('video-file').onchange=()=>loadVideo($('video-file').files[0]);
 $('capture-file').onchange=async()=>{const f=$('capture-file').files[0];pendingCapture=null;$('review-capture').checked=false;reviewReady();if(!f)return;
   try{if(!maxDocumentBytes)throw Error('Document limits are loading; select the file again.');if(f.size>maxDocumentBytes)throw Error('Capture exceeds the '+maxDocumentBytes+' byte document limit.');const candidate=JSON.parse(await f.text());const checked=await api('/api/capture/validate',{capture:candidate});
-    pendingCapture=candidate;const dimensionality=candidate.retargeting==='spatial_arm_v1'?'3D arm':checked.metadata.max_out_of_plane_deg.toFixed(1)+' degrees out of plane';$('capture-status').textContent=candidate.provenance.kind+' / '+checked.metadata.source_duration_s.toFixed(2)+' s / '+dimensionality+' / '+checked.metadata.missing_frames+' missing frames. Inspect overlays and confirm the mapping.';
+    pendingCapture=candidate;const dimensionality=candidate.retargeting==='spatial_arm_v1'?'3D arm':checked.metadata.max_out_of_plane_deg.toFixed(1)+' degrees out of plane';$('capture-status').textContent=candidate.provenance.kind+' / '+checked.metadata.source_duration_s.toFixed(2)+' s / '+dimensionality+' / '+checked.metadata.missing_frames+' missing frames'+(checked.body_keypoints?' / full body ('+checked.body_keypoints+' keypoints)':'')+'. Inspect overlays and confirm the mapping.';
   }catch(e){$('capture-status').textContent=e.message;}finally{reviewReady();}
 };
 $('use-capture').onclick=async()=>{if(!pendingCapture||!$('review-capture').checked||hashingVideo)return;
@@ -82,7 +82,9 @@ $('replay').onclick=async()=>{if(!gltf)return;exported=!exported;if(exported){co
 $('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'Pause':'Play';$('play').setAttribute('aria-label',playing?'Pause playback':'Play playback');};
 $('timeline').oninput=()=>{if(current)cursor=Number($('timeline').value)*current.duration;};
 function slerp(a,b,u){let dot=a.reduce((v,x,i)=>v+x*b[i],0);if(dot<0){b=b.map(x=>-x);dot=-dot;}let q;if(dot>.9995){q=a.map((x,i)=>(1-u)*x+u*b[i]);}else{const angle=Math.acos(Math.min(1,dot));q=a.map((x,i)=>(Math.sin((1-u)*angle)*x+Math.sin(u*angle)*b[i])/Math.sin(angle));}const n=Math.hypot(...q);return q.map(x=>x/n);}
-function sampleRig(frames,t){let lo=0,hi=frames.length-1;while(lo+1<hi){const mid=(lo+hi)>>1;if(frames[mid].t<=t)lo=mid;else hi=mid;}if(t>=frames.at(-1).t)return frames.at(-1).rotations_xyzw;const a=frames[lo],b=frames[hi],u=Math.max(0,(t-a.t)/(b.t-a.t));return a.rotations_xyzw.map((q,i)=>slerp(q,b.rotations_xyzw[i],u));}
+function rigFrames(frames,t){let lo=0,hi=frames.length-1;while(lo+1<hi){const mid=(lo+hi)>>1;if(frames[mid].t<=t)lo=mid;else hi=mid;}const a=frames[lo],b=frames[hi];return [a,b,t>=b.t?1:Math.max(0,(t-a.t)/(b.t-a.t))];}
+function sampleRig(frames,t){const [a,b,u]=rigFrames(frames,t);return a.rotations_xyzw.map((q,i)=>slerp(q,b.rotations_xyzw[i],u));}
+function sampleTranslation(frames,t){const [a,b,u]=rigFrames(frames,t);return a.translation?a.translation.map((x,i)=>x+(b.translation[i]-x)*u):null;}
 function sampleFrames(frames,t){let lo=0,hi=frames.length-1;while(lo+1<hi){const mid=(lo+hi)>>1;if(frames[mid].t<=t)lo=mid;else hi=mid;}if(t>=frames.at(-1).t)return frames.at(-1);const a=frames[lo],b=frames[hi],u=Math.max(0,(t-a.t)/(b.t-a.t));const out={...a};for(const k of ['q','target','elbow','hand','target_elbow','target_hand'])if(a[k])out[k]=a[k].map((x,i)=>x+(b[k][i]-x)*u);if(a.rotations){out.rotations=a.rotations.map((q,i)=>slerp(q,b.rotations[i],u));Object.assign(out,quaternionArm(out.rotations));out.q=out.rotations.map(q=>2*Math.atan2(q[2],q[3]));}return out;}
 function rotate(q,v){const [x,y,z,w]=q;const t=[2*(y*v[2]-z*v[1]),2*(z*v[0]-x*v[2]),2*(x*v[1]-y*v[0])];return [v[0]+w*t[0]+y*t[2]-z*t[1],v[1]+w*t[1]+z*t[0]-x*t[2],v[2]+w*t[2]+x*t[1]-y*t[0]];}
 function quaternionArm(q){const a=rotate(q[0],[.34,0,0]);const b=rotate(q[0],rotate(q[1],[.29,0,0]));return {elbow:[a[0],1.4+a[1],a[2]],hand:[a[0]+b[0],1.4+a[1]+b[1],a[2]+b[2]]};}
@@ -115,7 +117,8 @@ function draw(now){const dt=Math.min((now-previous)/1000,.1);previous=now;if(res
     }
     state={obstacle:!!current.obstacle,actual:armPoints(f),target:targetPoints(original),replay:exported,contact:!exported&&!!original.contacts,
       label:exported?'EXPORTED MOTION':original.contacts?'CONTACT':'REACH',
-      showPhysics:$('show-physics').checked,character:result.retarget?{side:result.retarget.side,toPuppet:result.retarget.character_to_puppet,rotations:sampleRig(result.retarget.frames,cursor),replayTime:exported?cursor:null}:null};
+      showPhysics:$('show-physics').checked,character:result.retarget?{side:result.retarget.side,toPuppet:result.retarget.character_to_puppet,rotations:sampleRig(result.retarget.frames,cursor),
+        bones:result.retarget.mode==='body'?result.retarget.bones:null,translationBone:result.retarget.translation_bone||null,translation:sampleTranslation(result.retarget.frames,cursor),replayTime:exported?cursor:null}:null};
     $('timeline').value=cursor/current.duration;$('time').textContent=cursor.toFixed(2)+' / '+current.duration.toFixed(2)+' s';
   }
   if(stage){syncPath();stage.render(state);}
@@ -123,7 +126,7 @@ function draw(now){const dt=Math.min((now-previous)/1000,.1);previous=now;if(res
 }
 requestAnimationFrame(draw);
 fetch('/api/status').then(r=>r.json()).then(s=>{$('meta-status').textContent='Muse Spark · '+s.meta;
-  if(s.character&&stage){$('export-character').hidden=false;$('physics-toggle').hidden=false;$('view-toggle').hidden=false;stage.loadCharacter('/character.glb').then(()=>{$('character-note').textContent='Character: '+s.character.source+' · arm directions retargeted; its own proportions are kept (tick Show physics arm to compare).';}).catch(e=>{$('character-note').textContent='Character failed to load: '+e.message;});}}).catch(e=>{$('meta-status').textContent=e.message;});
+  if(s.character&&stage){$('export-character').hidden=false;$('physics-toggle').hidden=false;$('view-toggle').hidden=false;stage.loadCharacter('/character.glb').then(()=>{$('character-note').textContent='Character: '+s.character.source+' · captures with body keypoints drive the whole skeleton (captured arm from physics), others drive one arm; its own proportions are kept (tick Show physics arm to compare).';}).catch(e=>{$('character-note').textContent='Character failed to load: '+e.message;});}}).catch(e=>{$('meta-status').textContent=e.message;});
 simulate(fields(),'initial procedural fixture',false);
 
 // Manual buttons and Muse use this same action surface. No eval or DOM automation.

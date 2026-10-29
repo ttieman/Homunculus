@@ -155,17 +155,20 @@ export function createStage(canvas) {
   const character = {root: null, bones: {}, side: null, mixer: null, action: null};
   const sceneryBody = [torso, head, hipL, hipR, shoulderBar];
   const clean = name => name.replace(/[\[\]\.:\/]/g, ''); // GLTFLoader strips these from node names
-  const bone = (name, side) => character.bones[clean(`${name}.${side}`)];
+  const bone = (name, side) => character.bones[clean(side ? `${name}.${side}` : name)];
+  // Put every bone back in its rest pose (used when the set of driven bones changes).
+  function restAll() {
+    for (const b of Object.values(character.bones)) {
+      if (b.userData.restRotation) b.quaternion.copy(b.userData.restRotation);
+      if (b.userData.restPosition) b.position.copy(b.userData.restPosition);
+    }
+  }
   const handWorld = new THREE.Vector3();
   const placement = new THREE.Matrix4();
   function placeCharacter(side, toPuppet) {
     const key = side + JSON.stringify(toPuppet);
     if (!character.root || character.key === key) return;
-    if (character.side && character.side !== side) {
-      for (const b of ['upper_arm','forearm']) {
-        const old=bone(b,character.side);old.quaternion.copy(old.userData.restRotation);
-      }
-    }
+    if (character.side && character.side !== side) restAll();
     character.side=side;
     character.key = key;
     // toPuppet (row-major 3x3, from the server's retarget) maps character axes into the puppet/camera frame;
@@ -202,7 +205,7 @@ export function createStage(canvas) {
       character.root.add(gltf.scene);
       gltf.scene.traverse(o => {
         if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; }
-        if (o.name) {character.bones[o.name] = o;o.userData.restRotation=o.quaternion.clone();}
+        if (o.name) {character.bones[o.name] = o;o.userData.restRotation=o.quaternion.clone();o.userData.restPosition=o.position.clone();}
       });
       for (const s of 'LR') for (const b of ['upper_arm', 'forearm', 'hand'])
         if (!bone(b, s)) throw new Error(`Character is missing ${b}.${s}`);
@@ -220,6 +223,7 @@ export function createStage(canvas) {
       if (!buffer) return;
       const gltf = await loader.parseAsync(buffer, '');
       if (!gltf.animations.length) throw new Error('Exported character has no animation');
+      restAll(); character.driven = null;
       character.action = character.mixer.clipAction(gltf.animations[0]);
       character.action.play();
     },
@@ -265,8 +269,12 @@ export function createStage(canvas) {
           if (pose.replayTime != null && character.action) {
             character.mixer.setTime(pose.replayTime);
           } else if (pose.rotations) {
-            bone('upper_arm', pose.side).quaternion.fromArray(pose.rotations[0]);
-            bone('forearm', pose.side).quaternion.fromArray(pose.rotations[1]);
+            // Retargets name their bones (full body: every bone + pelvis height); older ones drive one arm.
+            const names = pose.bones || [`upper_arm.${pose.side}`, `forearm.${pose.side}`];
+            const key = names.join();
+            if (character.driven !== key) { restAll(); character.driven = key; canvas.dataset.drivenBones = names.length; }
+            names.forEach((name, i) => bone(name)?.quaternion.fromArray(pose.rotations[i]));
+            if (pose.translation && pose.translationBone) bone(pose.translationBone)?.position.fromArray(pose.translation);
           }
           character.root.updateMatrixWorld(true);
           bone('hand', pose.side).getWorldPosition(handWorld);

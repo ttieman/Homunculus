@@ -83,7 +83,9 @@ def main():
                 # Preserve every numeric raw output, without unsafe pickle files.
                 numeric={k:v for k,v in pred.items() if isinstance(v,(np.ndarray,float,int))}
                 np.savez_compressed(args.output/f'raw-{frame_index:06d}.npz',**numeric)
-                record['arm']=np.asarray(pred['pred_keypoints_3d'])[indices].tolist()
+                keypoints=np.asarray(pred['pred_keypoints_3d'])
+                record['arm']=keypoints[indices].tolist()
+                record['body']=keypoints[:len(mhr_names)].tolist()  # every named keypoint, for full-body retargeting
                 xy=np.asarray(pred['pred_keypoints_2d'])[indices]
                 for a,b in zip(xy[:-1],xy[1:]):
                     if np.all(np.isfinite([a,b])):
@@ -94,7 +96,7 @@ def main():
             print(f'{len(records)} frames, source t={t:.3f}s',flush=True)
     finally:
         video.release()
-    bundle={'schema':'homunculus.observations.v1','basis':basis.tolist(),'frames':records,
+    bundle={'schema':'homunculus.observations.v1','basis':basis.tolist(),'frames':records,'body_keypoints':list(mhr_names),
         'provenance':{'kind':'sam3d','model':'SAM 3D Body supplied checkpoint','revision':revision,
             'checkpoint_sha256':sha256(args.checkpoint),'mhr_sha256':sha256(args.mhr),
             'video_sha256':sha256(args.video),'side':args.side,'bbox':args.bbox,

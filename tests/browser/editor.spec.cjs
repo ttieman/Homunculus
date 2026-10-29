@@ -89,3 +89,25 @@ test('configured character is posed, exported and replayed',async({page})=>{
   await page.waitForTimeout(300);
   expect(errors).toEqual([]);
 });
+
+test('full-body capture drives every character bone and exports the body clip',async({page})=>{
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');
+  await expect(page.locator('#stage')).toHaveAttribute('data-character','loaded');
+  await page.getByLabel('Import worker capture.json').setInputFiles(path.resolve('outputs/test-body-capture.json'));
+  await expect(page.locator('#capture-status')).toContainText('full body (70 keypoints)');
+  await page.getByLabel('I checked the overlay, person and axis mapping').check();
+  await page.getByRole('button',{name:'Use captured motion',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Optimize captured motion',exact:true})).toBeEnabled();
+  await expect(page.locator('#stage')).toHaveAttribute('data-driven-bones','19');
+  const downloadPromise=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Export character GLB',exact:true}).click();
+  const file=await (await downloadPromise).path();
+  const glb=await fs.readFile(file);const json=JSON.parse(glb.subarray(20,20+glb.readUInt32LE(12)).toString());
+  expect(json.animations[0].name).toBe('Homunculus_Body');
+  expect(json.animations[0].channels.length).toBe(20); // 19 bone rotations + pelvis height
+  await page.getByRole('button',{name:'Replay export',exact:true}).click();
+  await expect(page.locator('#view-label')).toContainText('character clip');
+  await page.waitForTimeout(300);
+  expect(errors).toEqual([]);
+});

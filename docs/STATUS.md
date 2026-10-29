@@ -14,6 +14,7 @@ remain historical evidence, not a claim that every research stage is complete.
 | Browser comparison | Matching source video, source-time map, common animation transport | Seek latency is shown; no fake frame-perfect claim |
 | Export | Timed quaternion replay and Khronos validator check | Rigid arm glTF |
 | Character retarget | Arm directions onto an external stickman-contract GLB; viewer pose, GLB clip export, three.js replay | Directions only: no IK to contacts, rest body pose, other clips dropped; Bevy playback not yet tested |
+| Full-body retarget | 70 SAM keypoints -> all 19 moving stickman bones + pelvis height; captured arm from physics; backfill from raw NPZ | Kinematic and in place: no balance, travel, foot IK or contact cleanup; spine curvature not observed (torso bends as one); exact on synthetic poses, real accuracy unmeasured |
 | Capture quality | Diagnostics and optional annotated 2D-landmark evaluation | No invented confidence; calibrated 3D accuracy unmeasured |
 
 Spatial inputs: 2–30 seconds, 3–901 frames, observation gaps <=250 ms, finite

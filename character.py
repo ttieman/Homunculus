@@ -342,15 +342,64 @@ def export_character_glb(rig, retargeted, extras=None):
     for joint, node in enumerate(retargeted['nodes']):
         samplers.append({'input': times, 'output': add([f['rotations_xyzw'][joint] for f in frames], 'VEC4'),
                          'interpolation': 'LINEAR'})
-        channels.append({'sampler': joint, 'target': {'node': node, 'path': 'rotation'}})
-    doc['animations'] = [{'name': 'Homunculus_Reach', 'samplers': samplers, 'channels': channels}]
+        channels.append({'sampler': len(samplers) - 1, 'target': {'node': node, 'path': 'rotation'}})
+    if retargeted.get('translation_node') is not None:
+        samplers.append({'input': times, 'output': add([f['translation'] for f in frames], 'VEC3'), 'interpolation': 'LINEAR'})
+        channels.append({'sampler': len(samplers) - 1, 'target': {'node': retargeted['translation_node'], 'path': 'translation'}})
+    doc['animations'] = [{'name': 'Homunculus_Body' if retargeted.get('mode') == 'body' else 'Homunculus_Reach',
+                          'samplers': samplers, 'channels': channels}]
     doc['buffers'] = [{'byteLength': len(binary) + (-len(binary) % 4)}]
     doc['bufferViews'] = views
     doc['accessors'] = accessors
-    doc['extras'] = {'homunculus': {'side': retargeted['side'], 'bones': retargeted['bones'],
+    doc['extras'] = {'homunculus': {'mode': retargeted.get('mode', 'arm'), 'side': retargeted['side'], 'bones': retargeted['bones'],
                                     'view': retargeted['view'], 'mapping': retargeted['mapping'], 'note': retargeted['note'],
                                     **(extras or {})}}
     return write_glb(doc, binary)
+
+
+def replay_pose(blob):
+    """Independent decode of an exported character GLB: FK of the whole rig at every key.
+
+    Returns (times, {node name: K x 3 world positions in character space}).
+    """
+    rig = Rig(blob)
+    doc, binary = rig.document, rig.binary
+    anim = doc['animations'][0]
+
+    def read(index, width):
+        acc = doc['accessors'][index]; view = doc['bufferViews'][acc['bufferView']]
+        if acc['componentType'] != 5126:
+            raise ValueError('Unexpected animation component type')
+        offset = view.get('byteOffset', 0) + acc.get('byteOffset', 0)
+        if offset + acc['count']*width*4 > view.get('byteOffset', 0) + view['byteLength']:
+            raise ValueError('Truncated animation accessor')
+        return np.array(struct.unpack_from('<' + 'f'*(acc['count']*width), binary, offset)).reshape(-1, width)
+
+    times, tracks = None, {}
+    for channel in anim['channels']:
+        sampler = anim['samplers'][channel['sampler']]
+        t = read(sampler['input'], 1)[:, 0]
+        if times is not None and not np.array_equal(t, times):
+            raise ValueError('Animation channels use different key times')
+        times = t
+        path = channel['target']['path']
+        if path not in ('rotation', 'translation') or (channel['target']['node'], path) in tracks:
+            raise ValueError('Unexpected animation channel')
+        tracks[(channel['target']['node'], path)] = read(sampler['output'], 4 if path == 'rotation' else 3)
+    nodes = doc['nodes']
+    order = [i for i in range(len(nodes)) if i not in rig.parent]
+    out = {n.get('name', str(i)): np.zeros((len(times), 3)) for i, n in enumerate(nodes)}
+    for k in range(len(times)):
+        stack = [(i, np.zeros(3), np.array([0, 0, 0, 1.])) for i in order]
+        while stack:
+            i, pt, pr = stack.pop()
+            t, r, _ = rig.local(i)
+            t = tracks.get((i, 'translation'), [t] * len(times))[k]
+            r = tracks.get((i, 'rotation'), [r] * len(times))[k]
+            wt, wr = pt + qmat(pr) @ t, qmul(pr, r)
+            out[nodes[i].get('name', str(i))][k] = wt
+            stack.extend((c, wt, wr) for c in nodes[i].get('children', []))
+    return times, out
 
 
 def replay_character(blob, side=None):

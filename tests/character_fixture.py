@@ -41,9 +41,18 @@ def build(drop_bone=None):
         joints.append(len(nodes) - 1)
         return len(nodes) - 1
 
+    # Joint layout measured from the Bevy-playground stickman (A-pose, faces +Z, left on +X).
     root = bone('root', None, [0, 0, 0], [0, 1, 0])
     pelvis = bone('pelvis', root, [0, .9, 0], [0, 1, 0])
-    chest = bone('chest', pelvis, [0, 1.25, 0], [0, 1, 0])
+    spine = bone('spine', pelvis, [0, 1.07, 0], [0, 1, 0])
+    chest = bone('chest', spine, [0, 1.25, 0], [0, 1, 0])
+    neck = bone('neck', chest, [0, 1.41, 0], [0, 1, 0])
+    bone('head', neck, [0, 1.49, 0], [0, 1, 0])
+    for side, sx in (('L', 1), ('R', -1)):
+        thigh = bone(f'thigh.{side}', pelvis, [.105*sx, .9, 0], [.036*sx, -.996, .085])
+        shin = bone(f'shin.{side}', thigh, [.12*sx, .49, .035], [.027*sx, -.995, -.094])
+        foot = bone(f'foot.{side}', shin, [.13*sx, .12, 0], [0, -.298, .954], (1, 0, 0))
+        bone(f'toe.{side}', foot, [.13*sx, .07, .16], [0, 0, 1], (1, 0, 0))
     for side, sx in (('L', 1), ('R', -1)):
         sh = bone(f'shoulder.{side}', chest, [.13*sx, 1.34, 0], [sx, -.18, 0])
         up = bone(f'upper_arm.{side}', sh, [.24*sx, 1.32, 0], [.65*sx, -.75, -.09])

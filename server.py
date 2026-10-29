@@ -73,7 +73,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200,{'arguments':validate_command(body.get('name'),body.get('arguments'))})
             if self.path == '/api/capture/validate':
                 motion = prepare(body['capture'])
-                return self.send(200,{'metadata':motion.metadata})
+                import body as full_body
+                track = full_body.body_track(body['capture'])
+                return self.send(200,{'metadata':motion.metadata,'body_keypoints':0 if track is None else len(track[2])})
             if self.path == '/api/reference':
                 from spatial import SpatialMotion
                 from timeline import Timeline
@@ -104,7 +106,14 @@ class Handler(BaseHTTPRequestHandler):
                 if self.rig:
                     view=body.get('view')
                     if view is not None and view not in character.VIEWS: raise ValueError('view must be one of '+', '.join(sorted(character.VIEWS)))
-                    result['retarget']=character.retarget(result,self.rig,view=view)
+                    if body.get('body') not in (None,True,False): raise ValueError('body must be true or false')
+                    capture=body.get('capture')
+                    import body as full_body
+                    if capture is not None and body.get('body') is not False and full_body.body_track(capture) is not None:
+                        keys=motion.timeline.document['keyframes'] if getattr(motion,'timeline',None) else None
+                        result['retarget']=full_body.retarget_body(result,self.rig,capture,keys)
+                    else:
+                        result['retarget']=character.retarget(result,self.rig,view=view)
                     payload['character_glb']=character.b64(character.export_character_glb(self.rig,result['retarget'],
                         {'provenance':result['source'],'edit':result['edit'],'capture':result.get('capture')}))
                 return self.send(200,payload)
