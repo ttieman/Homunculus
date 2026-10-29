@@ -30,7 +30,8 @@ segments over *source* time, `{id, start, end, blend, curve}` plus any of
 `strength`, `damping` (physics) and `speed` (timing). `blend` seconds at each end
 ease the segment's values in and out of the clip-wide settings along `curve`.
 
-**1a — physics per segment (first).** Strength (0.1–2) and damping (0.2–3)
+**1a — physics per segment (done 2026-10-28).** `segments.py`; `set_segment` /
+`clear_segments` commands (Muse tools too) and a **Segment physics** panel; undoable. Strength (0.1–2) and damping (0.2–3)
 override the clip-wide controls inside a segment; the MuJoCo loop reads them per
 2 ms step through the output→source time map, and each result frame records the
 gains used. Physics drives only the supported arm, so the visible effect needs

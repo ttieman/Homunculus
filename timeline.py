@@ -92,6 +92,22 @@ class Timeline:
         return Timeline(doc)
 
 
+def source_time(keys, duration, t):
+    """Result time -> source-clip time, honoring timeline retiming (as the browser's video sync does)."""
+    tau = float(np.clip(t / duration, 0, 1)) * keys[-1]['time']
+    if not all(isinstance(k.get('sourceTime'), (int, float)) for k in keys):
+        return None
+    i = 0
+    while i < len(keys) - 2 and keys[i + 1]['time'] <= tau:
+        i += 1
+    u = min(max((tau - keys[i]['time']) / (keys[i + 1]['time'] - keys[i]['time']), 0), 1)
+    if keys[i]['interpolation'] == 'smoothstep':
+        u = u * u * (3 - 2 * u)
+    if keys[i]['interpolation'] == 'hold':
+        u = 0
+    return keys[i]['sourceTime'] + (keys[i + 1]['sourceTime'] - keys[i]['sourceTime']) * u
+
+
 def from_spatial(times,poses,metadata):
     library={}; keys=[]
     for i,(t,q) in enumerate(zip(times,poses)):

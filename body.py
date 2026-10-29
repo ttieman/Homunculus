@@ -22,6 +22,7 @@ camera maps with the identity; turning away from the camera shows as pelvis yaw.
 import numpy as np
 
 from character import mat_q, qmat, unit
+from timeline import source_time
 
 # Official SAM 3D Body (MHR70) keypoint names, facebookresearch/sam-3d-body
 # sam_3d_body/metadata/mhr70.py at b5c765a. Captures carry their own list; lookups are by name.
@@ -104,22 +105,6 @@ def smooth(times, points, sigma=SMOOTH_SIGMA_S):
         w[np.abs(times - t) > 3 * sigma] = 0
         out[i] = np.tensordot(w / w.sum(), points, axes=1)
     return out
-
-
-def source_time(keys, duration, t):
-    """Result time -> source-clip time, honoring timeline retiming (as the browser's video sync does)."""
-    tau = float(np.clip(t / duration, 0, 1)) * keys[-1]['time']
-    if not all(isinstance(k.get('sourceTime'), (int, float)) for k in keys):
-        return None
-    i = 0
-    while i < len(keys) - 2 and keys[i + 1]['time'] <= tau:
-        i += 1
-    u = min(max((tau - keys[i]['time']) / (keys[i + 1]['time'] - keys[i]['time']), 0), 1)
-    if keys[i]['interpolation'] == 'smoothstep':
-        u = u * u * (3 - 2 * u)
-    if keys[i]['interpolation'] == 'hold':
-        u = 0
-    return keys[i]['sourceTime'] + (keys[i + 1]['sourceTime'] - keys[i]['sourceTime']) * u
 
 
 def derive(p):

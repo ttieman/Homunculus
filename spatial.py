@@ -105,6 +105,9 @@ def prepare_spatial(bundle):
     motion.metadata['capture_max_angular_speed_deg_s']=motion.metadata.pop('max_angular_speed_deg_s')
     motion.metadata['reference_diagnostics']=motion.timeline.validate_motion()
     motion.metadata['source_duration_s']=float(motion.times[-1])
+    import segments
+    motion.timing=segments.validate(bundle['timing'],float(times[-1])) if 'timing' in bundle else None
+    motion.metadata['segments']=segments.describe(motion.timing)
     return motion
 
 
@@ -139,10 +142,19 @@ def run_spatial(edit, motion, physics=None, disturbance=None):
         when=disturbance.get('time_s')
         if impulse.shape!=(4,) or not np.isfinite(impulse).all() or np.max(np.abs(impulse))>1 or not isinstance(when,(int,float)) or not 0<=when<edit.duration: raise ValueError('Disturbance requires time within clip and four bounded joint impulses (<=1 Nms)')
         impulse_step=round(when/model.opt.timestep)
+    timing=getattr(motion,'timing',None); keys=motion.timeline.document['keyframes']
+    if timing and timing['segments']:
+        import segments
+        from timeline import source_time
     for i in range(steps+1):
         target=motion.target(data.time,edit.duration); error=np.zeros(4)
         mujoco.mj_differentiatePos(model,error,1.,data.qpos,target)
-        desired=physics['stiffness_base']*edit.strength*error-physics['damping_base']*edit.damping*data.qvel+data.qfrc_bias
+        # Segment gains are looked up at the source moment this output time shows.
+        if timing and timing['segments']:
+            s=source_time(keys,edit.duration,data.time)
+            strength,damping=segments.gains(timing,data.time/edit.duration*motion.times[-1] if s is None else s,edit.strength,edit.damping)
+        else: strength,damping=edit.strength,edit.damping
+        desired=physics['stiffness_base']*strength*error-physics['damping_base']*damping*data.qvel+data.qfrc_bias
         torque=np.clip(desired,-limit,limit)
         external=impulse/model.opt.timestep if i==impulse_step else np.zeros(4)
         errors.append(error.copy()); torques.append(torque.copy()); velocities.append(data.qvel.copy())
@@ -160,7 +172,7 @@ def run_spatial(edit, motion, physics=None, disturbance=None):
             frames.append({'t':float(data.time),'q':data.qpos.tolist(),'target':target.tolist(),'elbow':elbow,'hand':hand,
                 'target_elbow':te,'target_hand':th,'qvel':data.qvel.tolist(),'external_torque_Nm':external.tolist(),'torque_Nm':torque.tolist(),'commanded_torque_Nm':desired.tolist(),'previous_applied_torque_Nm':data.qfrc_applied.tolist(),'error_rad':error.tolist(),
                 'root_position':[0,1.4,0],'root_velocity':[0,0,0],'center_of_mass':data.subtree_com[1].tolist(),
-                'elbow_limit_violation_rad':max(0.,-.1-float(data.qpos[4]),float(data.qpos[4])-3.14),
+                'elbow_limit_violation_rad':max(0.,-.1-float(data.qpos[4]),float(data.qpos[4])-3.14),'strength':float(strength),'damping':float(damping),
                 'contacts':int(data.ncon),'contact_forces_local':forces,'contact_events':contact_records,
                 'local_rotations_xyzw':[data.qpos[[1,2,3,0]].tolist(),[0,0,float(np.sin(data.qpos[4]/2)),float(np.cos(data.qpos[4]/2))]]})
         if i<steps:

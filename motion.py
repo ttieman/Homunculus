@@ -22,6 +22,7 @@ def prepare(bundle):
         return prepare_spatial(bundle)
     if not isinstance(bundle,dict) or bundle.get('schema') != 'homunculus.observations.v1':
         raise ValueError('Expected homunculus.observations.v1 capture bundle')
+    if 'timing' in bundle: raise ValueError('Segments require a spatial capture')
     provenance = bundle.get('provenance',{})
     if not isinstance(provenance,dict) or provenance.get('kind') not in ('sam3d','synthetic_test'):
         raise ValueError('Capture provenance must identify sam3d or synthetic_test')

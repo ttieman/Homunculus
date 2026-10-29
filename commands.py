@@ -20,6 +20,7 @@ PROP = obj({'id':TEXT,'shape':enum('box','sphere'),'position':VEC,
            ('id','shape','position','scale','color'))
 SCENE = obj({'background':COLOR,'grid':BOOL,'light':num(0,5),'camera':enum('home','front','side','top'),
              'props':{'type':'array','items':PROP,'maxItems':20}})
+CURVE = enum('step','linear','smoothstep','smootherstep','ease_in','ease_out','ease_in_out','expo_in','expo_out')  # segments.CURVES
 SPECS = {
  'adjust_pose':('Rotate one spatial reference keyframe in joint-local space, then re-simulate. Shoulder supports x/y/z; elbow supports z only. Speed and joint constraints may reject the edit.',obj({'keyId':TEXT,'joint':enum('shoulder','elbow'),'axis':enum('x','y','z'),'degrees':num(-45,45)},('keyId','joint','axis','degrees'))),
  'inspect_workspace':('Read settings, scene, timeline keys, available attachments and result metrics.',obj()),
@@ -30,6 +31,8 @@ SPECS = {
  'optimize':('Run the bounded controller search for the current spatial capture.',obj()),
  'use_demo':('Replace captured motion with the procedural reach, preserving control settings.',obj()),
  'edit_timeline':('Edit a spatial capture timeline using existing key IDs. Only timing operations are supported.',obj({'commands':{'type':'array','minItems':1,'maxItems':50,'items':obj({'operation':enum('move_keyframe','set_duration','set_interpolation'),'targetId':TEXT,'parameters':obj({'time':num(0,30),'seconds':num(2,30),'interpolation':enum('linear','smoothstep','hold')})},('operation','parameters'))}},('commands',))),
+ 'set_segment':('Create or replace (by id) a range of the spatial capture, in source-clip seconds (the "Matched source" time), that overrides physics strength (.1-2) and/or damping (.2-3), easing in and out over blend seconds along curve. Re-simulates. Physics drives the supported arm; it shows on the character only with physics arm driving enabled.',obj({'id':TEXT,'start':num(0,30),'end':num(0,30),'strength':num(.1,2),'damping':num(.2,3),'blend':num(0,15),'curve':CURVE},('id','start','end'))),
+ 'clear_segments':('Remove the listed segment ids, or every segment when ids is omitted. Re-simulates.',obj({'ids':{'type':'array','items':TEXT,'minItems':1,'maxItems':64}})),
  'assemble_three_poses':('Reduce the spatial capture reference to its first, middle and last keys.',obj()),
  'undo':('Undo the previous motion, view or scene change.',obj()),
  'redo':('Redo the last undone change.',obj()),

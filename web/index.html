@@ -94,6 +94,14 @@
 
 <label for="pose-angle">Rotation change (degrees)</label><input id="pose-angle" type="number" min="-45" max="45" value="5"><button id="adjust-pose">Adjust pose</button></section>
 
+<section><h3>Segment physics</h3><p class="note">Override strength and/or damping for a range of the clip, in source seconds (the "Matched source" time). Physics shows on the character with Drive arm from physics ticked.</p>
+<label for="segment-id">Segment id (blank = next)</label><input id="segment-id" type="text" maxlength="40" placeholder="seg-1">
+<div class="row"><label for="segment-start">Start (s)</label><input id="segment-start" type="number" min="0" step="0.1" value="0"><label for="segment-end">End (s)</label><input id="segment-end" type="number" min="0" step="0.1" value="1"></div>
+<div class="row"><label for="segment-strength">Strength</label><input id="segment-strength" type="number" min="0.1" max="2" step="0.1" placeholder="—"><label for="segment-damping">Damping</label><input id="segment-damping" type="number" min="0.2" max="3" step="0.1" placeholder="—"></div>
+<div class="row"><label for="segment-blend">Blend (s)</label><input id="segment-blend" type="number" min="0" step="0.05" value="0.2"><label for="segment-curve">Curve</label><select id="segment-curve"><option>smoothstep</option><option>linear</option><option>smootherstep</option><option>ease_in</option><option>ease_out</option><option>ease_in_out</option><option>expo_in</option><option>expo_out</option><option>step</option></select></div>
+<p><button id="segment-apply">Apply segment</button> <button id="segment-clear">Clear segments</button></p>
+<pre id="segment-list" class="note">No segments.</pre></section>
+
 <section><h3>Scene setup</h3><label for="scene-background">Background</label><input id="scene-background" type="color" value="#142024">
 
 <label><input id="scene-grid" type="checkbox" checked> Show grid</label><label for="scene-light">Key light intensity</label><input id="scene-light" type="range" min="0" max="5" step=".1" value="2.1">

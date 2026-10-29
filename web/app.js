@@ -17,7 +17,7 @@ function lock(value){busy=value;for(const id of ['apply','undo','redo','propose'
 async function simulate(edit,source='manual',remember=true,capture=activeCapture,optimize=false){
   if(busy)return;lock(true);$('message').textContent='Simulating physical response…';
   try{const view=$('character-view').value;const payload=await api(optimize?'/api/synthesize':'/api/simulate',{edit,capture,physics_arm:$('physics-arm').checked,...(view==='auto'?{}:{view})});if(remember)redoHistory=[];if(remember&&current)history.push(structuredClone({edit:current,capture:activeCapture}));
-    edit=payload.result.edit;current=edit;activeCapture=capture;result=payload.result;gltf=payload.gltf;characterGlb=payload.character_glb||null;cursor=0;exported=false;replayFrames=null;stage?.setReplayClip(null);$('export-character').disabled=!characterGlb;proposal=null;$('accept').hidden=true;$('proposal').textContent='';
+    edit=payload.result.edit;current=edit;activeCapture=capture;showSegments();result=payload.result;gltf=payload.gltf;characterGlb=payload.character_glb||null;cursor=0;exported=false;replayFrames=null;stage?.setReplayClip(null);$('export-character').disabled=!characterGlb;proposal=null;$('accept').hidden=true;$('proposal').textContent='';
     $('shoulder_deg').disabled=!!capture;$('elbow_deg').disabled=!!capture;
     $('source-note').textContent=capture?'Imported '+capture.provenance.kind+' arm motion · Fixed shoulder · Recorded angles own the pose; duration, strength and damping remain editable. Muse can edit timing and bounded joint-local pose corrections; full-body poses and forces are not supported.':'Original procedural reference · MuJoCo torque control · Fixed shoulder. Arm-to-character retargeting is available; full-body balance is not included.';
     audit.push({source,edit:structuredClone(edit),at:new Date().toISOString()});fill(edit);
@@ -133,6 +133,13 @@ const initialRun=simulate(fields(),'initial procedural fixture',false);
 // Manual buttons and Muse use this same action surface. No eval or DOM automation.
 const originalReplay=$('replay').onclick, originalCharacterExport=$('export-character').onclick;
 let appliedView=$('character-view').value, appliedPhysics=$('show-physics').checked;
+async function segmentCommand(operation){
+  if(activeCapture?.retargeting!=='spatial_arm_v1')throw Error('Load a spatial capture first');
+  const payload=await api('/api/segments',{capture:activeCapture,operation});await requireSimulation(current,payload.capture);showSegments();
+  return {segments:payload.segments,physicsArm:$('physics-arm').checked};
+}
+function showSegments(){const list=activeCapture?.timing?.segments||[];
+  $('segment-list').textContent=list.length?list.map(s=>s.id+': '+s.start.toFixed(2)+'–'+s.end.toFixed(2)+' s'+('strength' in s?' · strength '+s.strength:'')+('damping' in s?' · damping '+s.damping:'')+(s.blend?' · blend '+s.blend+' s '+s.curve:'')).join(String.fromCharCode(10)):'No segments.';}
 async function requireSimulation(edit=current,capture=activeCapture,optimize=false){
   if(!await simulate(edit,'workspace command',false,capture,optimize))throw Error($('message').textContent);
   appliedView=$('character-view').value;appliedPhysics=$('show-physics').checked;
@@ -148,6 +155,7 @@ function inspect(){return {settings:{edit:current||fields(),view:appliedView,sho
   playback:{playing,time:cursor,replay:exported},characterLoaded:!!stage?.hasCharacter,
   capture:activeCapture?{kind:activeCapture.provenance.kind,retargeting:activeCapture.retargeting}:null,
   keyframes:activeCapture?.reference_animation?.keyframes?.map(k=>({id:k.id,time:k.time,interpolation:k.interpolation}))||[],
+  segments:activeCapture?.timing?.segments||[],sourceDuration:activeCapture?activeCapture.frames.at(-1).t-activeCapture.frames[0].t:null,physicsArm:$('physics-arm').checked,
   metrics:result?.metrics||null,limits:'Supported arm only; other body joints remain at rest. Decorative scene props have no collision.'};}
 const workspace=createWorkspace({
   inspect,fields,download,busy:()=>busy,
@@ -192,10 +200,16 @@ const workspace=createWorkspace({
       if(format==='reference'){if(!activeCapture)throw Error('No captured reference');const p=await api('/api/reference',{capture:activeCapture,duration:fields().duration});download('homunculus-reference.json',p.capture);}
       return {status:'Download requested',format};
     },
+    set_segment:async args=>segmentCommand({operation:'set',segment:args}),
+    clear_segments:async({ids})=>segmentCommand({operation:'clear',...(ids?{ids}:{})}),
     adjust_pose:async args=>{if(!activeCapture)throw Error('Load a spatial capture first');const payload=await api('/api/pose',{capture:activeCapture,...args});await requireSimulation(current,payload.capture);return {status:'Pose adjusted',keyId:args.keyId};}
   }
 });
 $('edit-key').onclick=async()=>{try{const k=activeCapture?.reference_animation?.keyframes[Number($('key-index').value)-1];if(!k)throw Error('Invalid key number');await workspace.manual('edit_timeline',{commands:[{operation:'move_keyframe',targetId:k.id,parameters:{time:Number($('key-time').value)}},{operation:'set_interpolation',targetId:k.id,parameters:{interpolation:$('key-curve').value}}]});}catch(e){$('message').textContent=e.message;}};
+$('segment-apply').onclick=async()=>{try{const args={id:$('segment-id').value.trim()||'seg-'+((activeCapture?.timing?.segments.length||0)+1),start:Number($('segment-start').value),end:Number($('segment-end').value),blend:Number($('segment-blend').value),curve:$('segment-curve').value};
+  for(const k of ['strength','damping'])if($('segment-'+k).value!=='')args[k]=Number($('segment-'+k).value);
+  await workspace.manual('set_segment',args);}catch(e){$('message').textContent=e.message;}};
+$('segment-clear').onclick=async()=>{try{await workspace.manual('clear_segments',{});}catch(e){$('message').textContent=e.message;}};
 $('adjust-pose').onclick=async()=>{try{const k=activeCapture?.reference_animation?.keyframes[Number($('key-index').value)-1];if(!k)throw Error('Invalid key number');await workspace.manual('adjust_pose',{keyId:k.id,joint:$('pose-joint').value,axis:$('pose-axis').value,degrees:Number($('pose-angle').value)});}catch(e){$('message').textContent=e.message;}};
 $('use-capture').onclick=async()=>{if(!pendingCapture||!$('review-capture').checked)return;try{const file=new File([JSON.stringify(pendingCapture)],'reviewed-capture.json',{type:'application/json'});const item=await workspace.attach(file);await workspace.manual('use_attachment',{id:item.id});}catch(e){$('message').textContent=e.message;$('capture-status').textContent=e.message;}};
 // A processed clip goes through the same attach + use_attachment path as a manual import.

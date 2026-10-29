@@ -146,6 +146,14 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/api/chat':
                 from muse_chat import turn
                 return self.send(200,turn(body))
+            if self.path == '/api/segments':
+                import segments
+                capture=body['capture']; frames=capture['frames']
+                if capture.get('retargeting')!='spatial_arm_v1': raise ValueError('Segments require a spatial capture')
+                capture['timing']=segments.apply(capture.get('timing'),object_value(body.get('operation'),'operation'),frames[-1]['t']-frames[0]['t'])
+                if not capture['timing']['segments']: del capture['timing']
+                prepare(capture)
+                return self.send(200,{'capture':capture,'segments':segments.describe(capture.get('timing'))})
             if self.path == '/api/pose':
                 from pose_editor import adjust
                 return self.send(200,{'capture':adjust(body['capture'],{k:v for k,v in body.items() if k!='capture'})})
