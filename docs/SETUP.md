@@ -64,9 +64,7 @@ Save reference produces an editable capture wrapper for the browser importer.
 Save session is an audit download; browser session import is not implemented.
 Neither a successful profile replay nor low tracking error measures capture accuracy.
 
-## Next experiments
+## Next steps
 
-Supply a local Meta key and run live timing-edit evaluation. Add independently
-annotated observations for capture-quality evaluation. Full-body crouching,
-ground contacts, balance, perturbation recovery and game rig mapping remain
-separate research milestones, not prerequisites for supported-arm authoring.
+See [PLAN.md](PLAN.md): timing/feel layer, its commands and speed lane, Muse
+chat editing (needs a local Meta key), then export and Bevy playback.

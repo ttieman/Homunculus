@@ -108,7 +108,8 @@ Published baseline evidence is in [docs/evidence](docs/evidence/).
 The shoulder is fixed to the world; the surrounding body silhouette is scenery.
 No free-standing balance or human muscle-force reconstruction is claimed.
 
-- [Setup and next experiment](docs/SETUP.md)
+- [Plan](docs/PLAN.md)
+- [Setup](docs/SETUP.md)
 - [Video to physical arm](docs/CAPTURE.md)
 - [Selected architecture and hardware inventory](docs/DECISIONS.md)
 - [Policies for every candidate model](docs/MODEL_POLICIES.md)
