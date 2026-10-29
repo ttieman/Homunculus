@@ -2,10 +2,10 @@ import copy
 import json
 import numpy as np
 import pytest
-from commands import validate_command, tools
-from muse_chat import turn
-from pose_editor import adjust
-from spatial import prepare_spatial
+from homunculus.editor.commands import validate_command, tools
+from homunculus.muse.chat import turn
+from homunculus.animation.pose_editor import adjust
+from homunculus.capture.spatial import prepare_spatial
 from test_spatial import bundle
 
 
@@ -39,7 +39,7 @@ def test_pose_edit_is_local_and_preserves_observations():
 
 
 def test_tool_receipt_loop_and_no_secret_in_payload(monkeypatch):
-    monkeypatch.setattr('muse_chat.configured_key',lambda:'fixture-key')
+    monkeypatch.setattr('homunculus.muse.chat.configured_key',lambda:'fixture-key')
     call={'id':'c1','type':'function','function':{'name':'set_scene','arguments':'{"camera":"front"}'}}
     sent=[]
     class Response:

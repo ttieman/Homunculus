@@ -2,9 +2,10 @@ import copy
 import json
 import numpy as np
 import pytest
-from motion import prepare
-from puppet import Edit, run
-from exporter import export_gltf, replay_gltf
+from homunculus.capture.prepare import prepare
+from homunculus.physics.settings import Edit
+from homunculus.physics.simulate import run
+from homunculus.export.gltf import export_gltf, replay_gltf
 
 
 def sample_bundle():

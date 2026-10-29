@@ -28,6 +28,7 @@ import struct
 from pathlib import Path
 
 import numpy as np
+from homunculus import ROOT
 
 MAX_CHARACTER_BYTES = 32 * 1024 * 1024
 CHAIN = ('shoulder', 'upper_arm', 'forearm', 'hand')
@@ -166,7 +167,7 @@ def load_rig(path):
     return Rig(path.read_bytes(), path.name)
 
 
-def configured_path(root=Path(__file__).parent):
+def configured_path(root=ROOT):
     value = os.environ.get('HOMUNCULUS_CHARACTER', '').strip()
     env = root / '.env.local'
     if not value and env.is_file():

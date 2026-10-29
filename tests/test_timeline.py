@@ -2,7 +2,7 @@ import copy
 import json
 import numpy as np
 import pytest
-from timeline import Timeline, from_spatial, slerp
+from homunculus.animation.timeline import Timeline, from_spatial, slerp
 
 
 def reference():

@@ -1,9 +1,9 @@
 """Bounded joint-local edits of captured references; original observations retained."""
 import copy
 import numpy as np
-from commands import validate_command
-from spatial import prepare_spatial
-from timeline import Timeline
+from homunculus.editor.commands import validate_command
+from homunculus.capture.spatial import prepare_spatial
+from homunculus.animation.timeline import Timeline
 
 
 def adjust(capture, arguments):

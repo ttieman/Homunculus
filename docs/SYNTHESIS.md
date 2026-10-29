@@ -6,9 +6,9 @@ original recorded experiment, not an automatic rerun after every change.
 
 ## Audit and selected scope
 
-Existing modules are retained: `capture_video.py` owns offline SAM inference;
-`motion.py` validates the original planar capture; `puppet.py` owns the existing
-MuJoCo arm; `server.py` and `web/` own the loopback editor; `exporter.py` owns glTF.
+Existing modules are retained: `worker/capture_video.py` owns offline SAM inference;
+`homunculus/capture/planar.py` validates the original planar capture; `homunculus/physics/planar.py` owns the existing
+MuJoCo arm; `homunculus/editor/server.py` and `web/` own the loopback editor; `homunculus/export/gltf.py` owns glTF.
 Muse Spark already proposes bounded procedural edits but has no configured API
 access. Model jobs are offline SSH/CLI operations, not a durable web job queue.
 Raw and generated personal assets live in ignored `private/` and `outputs/`.
@@ -26,7 +26,7 @@ of all six proposed stages or of a standing/crouching character.
   model revision and raw prediction NPZ files. Raw MHR parameters are never
   interpreted as engine quaternions. Named shoulder/elbow/wrist keypoints supply
   directions, independent of reconstructed scale and root translation.
-- Pose library / reference: `timeline.py`, reference v1, skeleton ID, stable pose
+- Pose library / reference: `homunculus/animation/timeline.py`, reference v1, skeleton ID, stable pose
   and key IDs, local unit quaternions (wxyz), root positions and timing curves.
   Hemisphere-correct shortest-arc SLERP interpolates rotations. Root positions
   interpolate independently. Linear, smoothstep and hold are supported.
@@ -60,7 +60,7 @@ reduce effective rate. The worker retains all numeric predictions and overlays.
 On the editor machine:
 
 ```powershell
-.venv/Scripts/python.exe synthesize.py private/capture.json --output private/my-motion
+.venv/Scripts/python.exe scripts/synthesize.py private/capture.json --output private/my-motion
 ```
 
 This creates capture.json, reference-animation.json, simulation.json,

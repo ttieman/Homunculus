@@ -21,8 +21,8 @@ camera maps with the identity; turning away from the camera shows as pelvis yaw.
 """
 import numpy as np
 
-from character import mat_q, qmat, unit
-from timeline import source_time
+from homunculus.retarget.character import mat_q, qmat, unit
+from homunculus.animation.timeline import source_time
 
 # Official SAM 3D Body (MHR70) keypoint names, facebookresearch/sam-3d-body
 # sam_3d_body/metadata/mhr70.py at b5c765a. Captures carry their own list; lookups are by name.

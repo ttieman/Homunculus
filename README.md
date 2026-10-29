@@ -17,7 +17,8 @@ This is not yet the complete
 Meta-powered product, a full-body controller, or a game-ready retargeted clip.
 
 See [current capabilities and contracts](docs/STATUS.md) for spatial limits,
-asset replay and quality-evaluation boundaries.
+asset replay and quality-evaluation boundaries, the [code map](docs/ARCHITECTURE.md)
+for where everything lives, and the [plan](docs/PLAN.md) for what's next.
 
 ## Run
 
@@ -44,10 +45,10 @@ retargets the whole skeleton automatically and keeps the clip in ignored
 overrides). The captured arm follows the recording; tick **Drive arm from physics**
 to substitute the simulated arm.
 
-The worker is `worker_service.py`, run from the SAM environment on the GPU node:
+The worker is `worker/service.py`, run from the SAM environment on the GPU node:
 
 ```
-.venv/bin/python worker_service.py --host 127.0.0.1 --port 8766
+.venv/bin/python -m worker.service --host 127.0.0.1 --port 8766
 ```
 
 It queues one job at a time through the node's GPU lock (`with-gpu.sh`, exit 75 =
@@ -73,7 +74,7 @@ character's left/up/forward; **side-on** (planar captures and the demo) makes th
 reach direction the character's forward. Override it with **Recording view**. Only arm directions transfer;
 the character keeps its own (shorter) proportions and rest body pose, so its hand
 can stop short of where the physics hand touched. Tick **Show physics arm** to
-compare. See `character.py` for the exact conventions.
+compare. See `homunculus/retarget/character.py` for the exact conventions.
 
 **Full skeleton.** Captures that carry SAM's 70 body keypoints drive all 19
 moving bones (pelvis, spine, chest, neck, head, clavicles, arms, hands, legs and
@@ -84,14 +85,14 @@ place (no travel, no foot IK). The rig also needs `root` at the origin and
 record the keypoints; for an older run with its `raw-*.npz` files:
 
 ```
-python add_body.py private/run-001 private/run-001/capture-body.json
+python scripts/add_body.py private/run-001 private/run-001/capture-body.json
 ```
 
-Import `capture-body.json` as usual. See `body.py` for the per-bone rules.
+Import `capture-body.json` as usual. See `homunculus/retarget/body.py` for the per-bone rules.
 
 ```powershell
 .venv/Scripts/python.exe -m pytest -q
-.venv/Scripts/python.exe measure.py
+.venv/Scripts/python.exe scripts/measure.py
 ```
 
 Measurements and original-motion exports are written to ignored `outputs/`.

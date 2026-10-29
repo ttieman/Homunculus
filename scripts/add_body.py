@@ -9,10 +9,12 @@ character. The capture's frames, basis and provenance are kept as they are.
 import argparse
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
 
-from body import MHR70
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run from anywhere: python scripts/add_body.py
+from homunculus.retarget.body import MHR70
 
 
 def add_body(directory, capture=None):

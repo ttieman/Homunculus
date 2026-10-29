@@ -3,7 +3,7 @@
 Measured locally 2026-10-26/27; Windows, Python 3.13.1, MuJoCo 3.17.0,
 NumPy 2.5.4. No GPU inference, remote-controller run or training performed.
 
-Commands: `python -m pytest -q`; `python measure.py` using the isolated venv.
+Commands: `python -m pytest -q`; `python scripts/measure.py` using the isolated venv.
 Original source motion is `puppet.reference`. Geometry, mass, constraints and
 controller parameters are in `puppet.model_for` and `puppet.run`. No external
 motion dataset or game asset is used. See `evidence/summary.json` for raw metrics.

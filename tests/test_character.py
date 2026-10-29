@@ -9,11 +9,13 @@ from http.server import ThreadingHTTPServer
 import numpy as np
 import pytest
 
-import character
-from character import Rig, export_character_glb, mapping, puppet_arm, read_glb, replay_character, retarget, to_character
+from homunculus.retarget import character
+from homunculus.retarget.character import Rig, export_character_glb, mapping, puppet_arm, read_glb, replay_character, retarget, to_character
 from character_fixture import build
-from puppet import Edit, run
-from spatial import prepare_spatial, run_spatial
+from homunculus.physics.settings import Edit
+from homunculus.physics.simulate import run
+from homunculus.capture.spatial import prepare_spatial
+from homunculus.physics.spatial import run_spatial
 from test_spatial import bundle
 
 
@@ -112,7 +114,7 @@ def test_configured_path_reads_env_local(tmp_path, monkeypatch):
 
 
 def test_server_serves_character_and_retargets_simulations(rig):
-    from server import Handler
+    from homunculus.editor.server import Handler
     Handler.rig = rig
     server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
     worker = threading.Thread(target=server.serve_forever, daemon=True); worker.start()

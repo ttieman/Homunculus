@@ -9,6 +9,9 @@ One job at a time, through the node's shared GPU lock (with-gpu.sh). Without bbo
 person is detected automatically. Non-mp4 uploads (e.g. OBS .mkv) are cut to the requested
 window and converted to H.264 mp4 first, so browsers can play exactly what was processed.
 Uploads and outputs stay under private/jobs/.
+
+Run from the deployed folder (holding .venv, checkpoints, sam-3d-body, homunculus/, worker/):
+    .venv/bin/python -m worker.service --host 127.0.0.1 --port 8766
 """
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -22,7 +25,7 @@ import threading
 import time
 import uuid
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parents[1]  # the deployed folder
 JOBS = ROOT / 'private' / 'jobs'
 GPU = Path.home() / 'experiments' / 'with-gpu.sh'
 MAX_UPLOAD = 200 * 1024 * 1024
@@ -43,7 +46,7 @@ def duration(video):
 
 def command(job):
     checkpoint = ROOT / 'checkpoints' / 'sam-3d-body-dinov3'
-    cmd = [str(GPU), str(ROOT / '.venv/bin/python'), str(ROOT / 'capture_video.py'), str(job['video']),
+    cmd = [str(GPU), str(ROOT / '.venv/bin/python'), '-m', 'worker.capture_video', str(job['video']),
            '--sam-root', str(ROOT / 'sam-3d-body'), '--checkpoint', str(checkpoint / 'model.ckpt'),
            '--mhr', str(checkpoint / 'assets/mhr_model.pt'), '--output', str(job['dir'] / 'capture'),
            '--basis', *BASIS, '--spatial', '--side', job['side'], '--start', str(job['start']),

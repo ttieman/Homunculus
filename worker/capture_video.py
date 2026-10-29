@@ -1,4 +1,5 @@
-"""Offline SAM worker. Run inside the official SAM 3D Body environment.
+"""Offline SAM worker. Run inside the official SAM 3D Body environment, from the repository
+(or deployed) root: python -m worker.capture_video VIDEO ...
 
 No credentials, remote API, or background service changes.
 One stationary person inside a fixed bounding box: given with --bbox, or found with
@@ -11,7 +12,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
-from contracts import MAX_FRAMES, SampleGrid
+from homunculus.contracts import MAX_FRAMES, SampleGrid
 
 
 def sha256(path):
@@ -75,7 +76,7 @@ def main():
     import torch
     from sam_3d_body import load_sam_3d_body, SAM3DBodyEstimator
     from sam_3d_body.metadata.mhr70 import mhr_names
-    from motion import prepare
+    from homunculus.capture.prepare import prepare
     if not torch.cuda.is_available(): p.error('CUDA unavailable in this SAM environment')
     basis=np.asarray(args.basis).reshape(3,3)
     if not np.allclose(basis@basis.T,np.eye(3),atol=1e-5) or not np.isclose(np.linalg.det(basis),1):

@@ -1,4 +1,4 @@
-"""Validated observations -> planar targets. No inference is performed here."""
+"""Validated arm observations -> planar shoulder/elbow targets (the original capture path). No inference here."""
 from dataclasses import dataclass
 import hashlib
 import json
@@ -16,10 +16,7 @@ class Motion:
         return np.array([np.interp(source_t,self.times,self.angles[:,j]) for j in range(2)])
 
 
-def prepare(bundle):
-    if isinstance(bundle,dict) and bundle.get('retargeting')=='spatial_arm_v1':
-        from spatial import prepare_spatial
-        return prepare_spatial(bundle)
+def prepare_planar(bundle):
     if not isinstance(bundle,dict) or bundle.get('schema') != 'homunculus.observations.v1':
         raise ValueError('Expected homunculus.observations.v1 capture bundle')
     if 'timing' in bundle: raise ValueError('Segments require a spatial capture')

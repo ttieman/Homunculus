@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from character import mat_q, qinv, qmul, write_glb  # noqa: E402
+from homunculus.retarget.character import mat_q, qinv, qmul, write_glb  # noqa: E402
 
 
 def aim(direction, roll_hint=(0, 0, 1)):
@@ -31,7 +31,7 @@ def build(drop_bone=None):
             t, r = np.array(head, float), rot
         else:
             ph, pr = world[parent]
-            from character import qmat
+            from homunculus.retarget.character import qmat
             t = qmat(qinv(pr)) @ (np.array(head, float) - ph)
             r = qmul(qinv(pr), rot)
         world[len(nodes)] = (np.array(head, float), rot)
@@ -71,7 +71,7 @@ def build(drop_bone=None):
         jidx += [[j, 0, 0, 0]] * 3
         weights += [[1, 0, 0, 0]] * 3
         h, r = world[index]
-        from character import qmat
+        from homunculus.retarget.character import qmat
         m = np.eye(4); m[:3, :3] = qmat(r); m[:3, 3] = h
         inverse.append(np.linalg.inv(m).T.reshape(-1).tolist())  # column-major
     binary = bytearray(); views = []; accessors = []

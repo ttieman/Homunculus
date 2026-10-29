@@ -6,7 +6,7 @@ Python 3.13 is tested. Windows PowerShell, from this repository:
 python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements.txt
 .venv/Scripts/python.exe -m pytest -q
-.venv/Scripts/python.exe measure.py
+.venv/Scripts/python.exe scripts/measure.py
 .venv/Scripts/python.exe server.py
 ```
 
@@ -48,15 +48,15 @@ Use its isolated approved environment and checkpoints; do not reinstall or stop
 unrelated jobs as part of routine setup. The first takeover was explicitly
 requested by the user. Credentials and connection details remain local.
 
-The worker needs capture_video.py, motion.py and contracts.py together. Install
-these from the same revision. Use --spatial for 3D arm observations. The worker
+The worker needs `worker/` plus `homunculus/__init__.py`, `homunculus/contracts.py` and
+`homunculus/capture/` from the same revision; run it as `python -m worker.service`. Use --spatial for 3D arm observations. The worker
 and editor use separate Python environments; see CAPTURE.md and STATUS.md.
 
 ## Reusable motion assets
 
-Run `python synthesize.py private/capture.json --output private/new-asset`.
+Run `python scripts/synthesize.py private/capture.json --output private/new-asset`.
 The version-2 motion-profile.json references checksummed capture, reference,
-physics, trajectory, glTF and optimization files. `python assets.py private/new-asset`
+physics, trajectory, glTF and optimization files. `python -m homunculus.export.assets private/new-asset`
 reloads the recorded configuration and compares reproduced positions and torques.
 Do not edit linked files in place without regenerating the asset manifest.
 

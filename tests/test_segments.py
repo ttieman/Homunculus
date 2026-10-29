@@ -1,10 +1,11 @@
 import copy
 import numpy as np
 import pytest
-import segments
-from commands import validate_command
-from puppet import Edit
-from spatial import prepare_spatial, run_spatial
+from homunculus.animation import segments
+from homunculus.editor.commands import validate_command
+from homunculus.physics.settings import Edit
+from homunculus.capture.spatial import prepare_spatial
+from homunculus.physics.spatial import run_spatial
 from test_spatial import bundle
 
 EDIT = Edit(duration=3, obstacle=False)
@@ -31,7 +32,7 @@ def test_rejects_overlap_and_planar_timing():
     with pytest.raises(ValueError, match='overlap'):
         segments.validate({'schema': segments.SCHEMA, 'segments': [{'id': 'a', 'start': 0, 'end': 2, 'strength': .5},
                                                                    {'id': 'b', 'start': 1.5, 'end': 3, 'strength': .5}]}, 3)
-    from motion import prepare
+    from homunculus.capture.prepare import prepare
     planar = bundle(); planar.pop('retargeting'); planar['timing'] = segments.empty()
     with pytest.raises(ValueError, match='spatial'): prepare(planar)
 

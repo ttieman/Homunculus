@@ -20,7 +20,7 @@ remain historical evidence, not a claim that every research stage is complete.
 Spatial inputs: 2–30 seconds, 3–901 frames, observation gaps <=250 ms, finite
 poses and proper coordinate basis. Worker requests 2.1–30 seconds at 5–30 Hz.
 Planar mode retains its older 2–10-second/601-frame/geometric restrictions.
-Browser/server document limit: 8 MiB. Shared constants live in contracts.py.
+Browser/server document limit: 8 MiB. Shared constants live in homunculus/contracts.py.
 
 Local key: MODEL_API_KEY in the environment or ignored .env.local. The UI only
 reports configured/unconfigured; this is not a successful API entitlement test.
@@ -29,7 +29,7 @@ No key contents, private recordings or raw personal model output belong in Git.
 ## Files and reload paths
 
 - capture.json / saved reference wrapper: browser capture importer.
-- motion-profile.json v2: `python assets.py <asset-directory>` verifies checksums
+- motion-profile.json v2: `python -m homunculus.export.assets <asset-directory>` verifies checksums
   and replays the stored physical configuration.
 - reference-animation.json: linked asset component; use its wrapper for browser import.
 - animation.gltf: independent rigid-joint playback; no controller is embedded.
@@ -37,7 +37,7 @@ No key contents, private recordings or raw personal model output belong in Git.
 
 ## Quality evaluation
 
-`python quality.py private/capture.json --output private/quality.json` reports
+`python -m homunculus.capture.quality private/capture.json --output private/quality.json` reports
 missing/out-of-frame landmarks (if image dimensions exist), segment-length
 variation and explicit unknowns. Add `--annotations private/annotations.json`
 for independently labelled 2D pixel error, separated by recording condition.

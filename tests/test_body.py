@@ -4,12 +4,13 @@ import json
 import numpy as np
 import pytest
 
-import body
-from body import BODY_BONES, MHR70, retarget_body
-from character import Rig, export_character_glb, qmat, qmul, read_glb, replay_pose
+from homunculus.retarget import body
+from homunculus.retarget.body import BODY_BONES, MHR70, retarget_body
+from homunculus.retarget.character import Rig, export_character_glb, qmat, qmul, read_glb, replay_pose
 from character_fixture import build
-from puppet import Edit
-from spatial import prepare_spatial, run_spatial
+from homunculus.physics.settings import Edit
+from homunculus.capture.spatial import prepare_spatial
+from homunculus.physics.spatial import run_spatial
 from test_spatial import bundle
 
 BASIS = np.array([[1., 0, 0], [0, -1, 0], [0, 0, -1]])  # SAM camera axes -> puppet, as in real captures
@@ -260,7 +261,7 @@ def test_mhr70_names_match_the_official_metadata_shape():
 
 
 def test_add_body_backfills_from_preserved_npz(tmp_path, scenario):
-    import add_body
+    from scripts import add_body
     capture = copy.deepcopy(scenario[0])
     expected = [f.pop('body') for f in capture['frames']]
     capture.pop('body_keypoints')
@@ -281,7 +282,7 @@ def test_server_retargets_the_whole_body_when_the_capture_has_it(rig, scenario):
     import threading
     import urllib.request
     from http.server import ThreadingHTTPServer
-    from server import Handler
+    from homunculus.editor.server import Handler
 
     def post(base, route, data):
         request = urllib.request.Request(base + route, data=json.dumps(data).encode(), headers={'Content-Type': 'application/json'})

@@ -3,11 +3,12 @@ import json
 import numpy as np
 import pytest
 from test_spatial import bundle
-from spatial import prepare_spatial,run_spatial
-from puppet import Edit
-from assets import save_asset,replay_asset
-from quality import capture_quality
-from meta import propose_reference
+from homunculus.capture.spatial import prepare_spatial
+from homunculus.physics.spatial import run_spatial
+from homunculus.physics.settings import Edit
+from homunculus.export.assets import save_asset,replay_asset
+from homunculus.capture.quality import capture_quality
+from homunculus.muse.meta import propose_reference
 
 
 def test_asset_round_trip_and_corruption_detection(tmp_path):
@@ -61,7 +62,7 @@ def test_bounded_disturbance_is_measurable_reproducible_and_recorded(tmp_path):
 @pytest.mark.parametrize('operation',['valid','unsupported','unsafe'])
 def test_timeline_model_adapter_validates_without_sending_poses(monkeypatch,operation):
     b=bundle();original=copy.deepcopy(b)
-    monkeypatch.setattr('meta.configured_key',lambda:'test-only')
+    monkeypatch.setattr('homunculus.muse.meta.configured_key',lambda:'test-only')
     command={'operation':'set_duration','parameters':{'seconds':6}}
     if operation=='unsupported':command={'operation':'apply_torque','parameters':{'force':100}}
     if operation=='unsafe':command={'operation':'move_keyframe','targetId':'key-1','parameters':{'time':.000001}}

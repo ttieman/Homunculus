@@ -6,12 +6,13 @@ import urllib.error
 import numpy as np
 import pytest
 from http.server import ThreadingHTTPServer
-from contracts import SampleGrid, MAX_DOCUMENT_BYTES, MAX_FRAMES
+from homunculus.contracts import SampleGrid, MAX_DOCUMENT_BYTES, MAX_FRAMES
 from test_spatial import bundle
-from spatial import prepare_spatial, synthesize, run_spatial
-from puppet import Edit
-from server import Handler
-from exporter import export_gltf, replay_gltf
+from homunculus.capture.spatial import prepare_spatial
+from homunculus.physics.spatial import synthesize, run_spatial
+from homunculus.physics.settings import Edit
+from homunculus.editor.server import Handler
+from homunculus.export.gltf import export_gltf, replay_gltf
 
 
 def test_optimizer_includes_off_grid_current_configuration():

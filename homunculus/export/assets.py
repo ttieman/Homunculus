@@ -3,9 +3,10 @@ import hashlib
 import json
 from pathlib import Path
 import numpy as np
-from exporter import export_gltf, replay_gltf
-from puppet import Edit
-from spatial import prepare_spatial, run_spatial
+from homunculus.export.gltf import export_gltf, replay_gltf
+from homunculus.physics.settings import Edit
+from homunculus.capture.spatial import prepare_spatial
+from homunculus.physics.spatial import run_spatial
 
 
 def digest(data):

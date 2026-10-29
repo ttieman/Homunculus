@@ -2,10 +2,13 @@
 import argparse
 import json
 from pathlib import Path
+import sys
 import numpy as np
-from spatial import prepare_spatial, synthesize
-from puppet import Edit
-from exporter import export_gltf, replay_gltf
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run from anywhere: python scripts/synthesize.py
+from homunculus.capture.spatial import prepare_spatial
+from homunculus.physics.spatial import synthesize
+from homunculus.physics.settings import Edit
+from homunculus.export.gltf import export_gltf, replay_gltf
 
 
 def main():
@@ -21,7 +24,7 @@ def main():
     error=float(np.max(np.abs(np.asarray(replay_gltf(gltf))-np.array([f['hand'] for f in result['frames']]))))
     if error>1e-6: raise RuntimeError('Export transform verification failed')
     report.update(export_max_component_error_m=error,capture=motion.metadata)
-    from assets import save_asset
+    from homunculus.export.assets import save_asset
     save_asset(args.output,bundle,motion,result,report)
     print(json.dumps({'output':str(args.output),'selected':report['selected'],'metrics':result['metrics'],'export_error_m':error},indent=2))
 

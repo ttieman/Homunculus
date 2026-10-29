@@ -1,9 +1,10 @@
 import copy
 import numpy as np
 import pytest
-from spatial import prepare_spatial, run_spatial, synthesize, points
-from puppet import Edit
-from exporter import export_gltf, replay_gltf
+from homunculus.capture.spatial import prepare_spatial
+from homunculus.physics.spatial import run_spatial, synthesize, points
+from homunculus.physics.settings import Edit
+from homunculus.export.gltf import export_gltf, replay_gltf
 
 
 def bundle():

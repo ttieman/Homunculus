@@ -24,7 +24,7 @@ revisions. Add this repository to that environment's Python path or execute its
 script by absolute path. No changes to the editor's Python environment are needed.
 
 ```bash
-python capture_video.py /path/to/owned-reach.mp4 \
+python -m worker.capture_video /path/to/owned-reach.mp4 \
   --sam-root /path/to/sam-3d-body \
   --checkpoint /path/to/model.ckpt --mhr /path/to/mhr_model.pt \
   --output private/reach-001 \
@@ -105,4 +105,4 @@ worker supports 5–30 Hz; both importer and timeline share the 901-frame budget
 The browser/server document limit is 8 MiB. Edited and duration-scaled spatial
 references are checked for angular speeds above 720 degrees/second. Discontinuous
 hold transitions are rejected for physics. A held pose must be duplicated before
-a separate transition. Equivalent quaternion signs map to the same hinge angle. Run synthesize.py locally on its capture.json. See [SYNTHESIS.md](SYNTHESIS.md) for editing, optimization and artifact contracts. The original planar path retains its stricter geometric limits.
+a separate transition. Equivalent quaternion signs map to the same hinge angle. Run scripts/synthesize.py locally on its capture.json. See [SYNTHESIS.md](SYNTHESIS.md) for editing, optimization and artifact contracts. The original planar path retains its stricter geometric limits.

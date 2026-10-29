@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from character import Rig  # noqa: E402
+from homunculus.retarget.character import Rig  # noqa: E402
 from character_fixture import build  # noqa: E402
 from test_body import synthetic_capture  # noqa: E402
 

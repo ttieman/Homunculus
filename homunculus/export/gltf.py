@@ -84,7 +84,7 @@ def animation_tracks(document):
 def replay_gltf(document, sample_times=None):
     """Independent buffer decode, timed SLERP and FK; never reads source samples."""
     import numpy as np
-    from timeline import slerp
+    from homunculus.animation.timeline import slerp
     times,rotations=animation_tracks(document)
     def rotation(q):
         x,y,z,w=q

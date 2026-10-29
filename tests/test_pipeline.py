@@ -3,9 +3,10 @@ import copy
 import json
 import numpy as np
 import pytest
-from puppet import Edit, run
-from exporter import export_gltf, replay_gltf
-from meta import propose
+from homunculus.physics.settings import Edit
+from homunculus.physics.simulate import run
+from homunculus.export.gltf import export_gltf, replay_gltf
+from homunculus.muse.meta import propose
 
 
 @pytest.fixture(scope='module')
@@ -59,7 +60,7 @@ def test_invalid_edits(values):
 
 
 def test_missing_meta_is_explicit(monkeypatch):
-    monkeypatch.setattr('meta.configured_key',lambda: '')
+    monkeypatch.setattr('homunculus.muse.meta.configured_key',lambda: '')
     with pytest.raises(RuntimeError,match='BLOCKED'):
         propose('slower',Edit())
 

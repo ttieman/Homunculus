@@ -6,7 +6,8 @@ import time
 import urllib.request
 import urllib.error
 from dataclasses import asdict
-from puppet import Edit
+from homunculus import ROOT
+from homunculus.physics.settings import Edit
 
 MODEL = 'muse-spark-1.3'
 FIELDS = {k: {'type': 'boolean' if k == 'obstacle' else 'number'} for k in asdict(Edit())}
@@ -18,7 +19,7 @@ TOOL = {'type':'function','function':{'name':'propose_edit',
 def configured_key():
     value=os.environ.get('MODEL_API_KEY','').strip()
     if value: return value
-    path=Path(__file__).parent/'.env.local'
+    path=ROOT/'.env.local'
     if path.is_file():
         for line in path.read_text(encoding='utf-8-sig').splitlines():
             if line.strip().startswith('MODEL_API_KEY='):
@@ -64,7 +65,7 @@ def propose(prompt, current):
 def propose_reference(prompt, capture, current):
     """Meta edits structured timing operations; no poses, images or forces sent."""
     from copy import deepcopy
-    from spatial import prepare_spatial
+    from homunculus.capture.spatial import prepare_spatial
     motion=prepare_spatial(capture)
     timeline=motion.timeline.edited([{'operation':'set_duration','parameters':{'seconds':current.duration}}])
     key=configured_key()

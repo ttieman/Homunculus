@@ -4,7 +4,7 @@ Segments override clip-wide physics gains inside [start, end] (source seconds), 
 and out over `blend` seconds along `curve`. Speed segments are planned (docs/PLAN.md).
 """
 import copy
-from contracts import number, object_value
+from homunculus.contracts import number, object_value
 
 SCHEMA = 'homunculus.timing.v1'
 CURVES = {

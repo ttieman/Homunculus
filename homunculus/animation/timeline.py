@@ -1,7 +1,7 @@
 """Deterministic local-quaternion animation, separate from capture and physics."""
 import copy
 import numpy as np
-from contracts import MAX_FRAMES, number, object_value
+from homunculus.contracts import MAX_FRAMES, number, object_value
 
 SKELETON = 'homunculus.supported-arm.v1'
 

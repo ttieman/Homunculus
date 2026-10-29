@@ -15,10 +15,10 @@ This replaces the closed GitHub issues and the old "Next experiments" list.
 | Step | State |
 |---|---|
 | Submit a clip | Editor upload (mp4/webm/mov/mkv/avi/mpg, up to 30 s from a start time). Non-mp4 is cut and converted on the worker. |
-| SAM 3D Body service | `worker_service.py` on the GPU node, one job at a time through `with-gpu.sh`; ViTDet person box; progress in the editor. ~1 s per sampled frame on the RTX 2060. |
+| SAM 3D Body service | `worker/service.py` on the GPU node, one job at a time through `with-gpu.sh`; ViTDet person box; progress in the editor. ~1 s per sampled frame on the RTX 2060. |
 | Whole-skeleton retarget | Automatic on job completion; clip kept in `private/clips/`, newest opens on load. Captured arm follows the recording; physics arm optional. |
-| Timing primitives | Keyframes carry `time` + `sourceTime`; `body.source_time` maps output time to source time, so retiming already moves the body, physics reference and video sync together. Interpolation is `linear`, `smoothstep` or `hold` per key. |
-| Muse plumbing | Chat panel ("Direct the workspace"), typed tool catalog shared with manual controls (`commands.py` → `workspace.js`), undo, receipts, 8-turn cap. **Never called live**: no `MODEL_API_KEY`; model id `muse-spark-1.3` and endpoint are unverified. |
+| Timing primitives | Keyframes carry `time` + `sourceTime`; `timeline.source_time` maps output time to source time, so retiming already moves the body, physics reference and video sync together. Interpolation is `linear`, `smoothstep` or `hold` per key. |
+| Muse plumbing | Chat panel ("Direct the workspace"), typed tool catalog shared with manual controls (`homunculus/editor/commands.py` → `web/workspace.js`), undo, receipts, 8-turn cap. **Never called live**: no `MODEL_API_KEY`; model id `muse-spark-1.3` and endpoint are unverified. |
 
 ## Phase 1 — Segment layer: physics, then speed (next)
 
@@ -30,7 +30,7 @@ segments over *source* time, `{id, start, end, blend, curve}` plus any of
 `strength`, `damping` (physics) and `speed` (timing). `blend` seconds at each end
 ease the segment's values in and out of the clip-wide settings along `curve`.
 
-**1a — physics per segment (done 2026-10-28).** `segments.py`; `set_segment` /
+**1a — physics per segment (done 2026-10-28).** `homunculus/animation/segments.py`; `set_segment` /
 `clear_segments` commands (Muse tools too) and a **Segment physics** panel; undoable. Strength (0.1–2) and damping (0.2–3)
 override the clip-wide controls inside a segment; the MuJoCo loop reads them per
 2 ms step through the output→source time map, and each result frame records the
@@ -67,7 +67,7 @@ the exported GLB clip length matches.
 
 ## Phase 2 — Commands and manual UI
 
-* Tools in `commands.py` (shared by buttons and Muse): `set_segment` (range plus
+* Tools in `homunculus/editor/commands.py` (shared by buttons and Muse): `set_segment` (range plus
   strength/damping/speed, curve, blend), `apply_feel(preset, range?)`,
   `clear_segments(range?)`; segments appear in `inspect_workspace`. The physics
   half lands with 1a so Muse can use it as soon as access is verified.
@@ -83,7 +83,7 @@ through save reference / reload.
 * **Access (grA):** add `MODEL_API_KEY=...` to `.env.local`. Claude never reads or
   writes `.env*`.
 * Verify the real model id, endpoint and tool-call format with one live call;
-  fix `meta.py`/`muse_chat.py` to match. Status shows *verified* only after that.
+  fix `homunculus/muse/meta.py`/`chat.py` to match. Status shows *verified* only after that.
 * System prompt and state: Muse sees clip length, current segments, motion
   phases (key times where speed peaks/stops, derived from the body track), and
   the curve/preset catalog — not raw keypoints or video.
@@ -112,6 +112,9 @@ name the clip after the source, and verify playback in `bevy-playground`
 * **Consolidate** — venv and clips into this repo's folder; retire the
   force-puppet checkout; permanent worker service on the GPU node (systemd unit,
   grA's call) instead of the SSH-session runner.
+* **Readability** — reformat the densest files (`web/app.js`, `web/index.html`,
+  `homunculus/physics/spatial.py`) into one statement per line; split `retarget/character.py`
+  (GLB I/O, quaternions, arm retarget).
 * **Speed** — sample rate choice per job; overlapping conversion with inference.
 
 ## Open questions

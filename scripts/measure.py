@@ -1,11 +1,14 @@
 """Reproduce the first experiment and retain raw original-motion artifacts."""
 from dataclasses import replace
 from pathlib import Path
+import sys
 import json
 import platform
 import numpy as np
-from puppet import Edit, run
-from exporter import export_gltf, replay_gltf
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run from anywhere: python scripts/measure.py
+from homunculus.physics.settings import Edit
+from homunculus.physics.simulate import run
+from homunculus.export.gltf import export_gltf, replay_gltf
 
 
 def main():

@@ -22,9 +22,9 @@ proportions. It is still a single supported arm; the rest of the body is at rest
 
 ## Components
 
-`commands.py` is the typed tool catalog and strict argument validator. Both UI
+`homunculus/editor/commands.py` is the typed tool catalog and strict argument validator. Both UI
 and Muse execute through `web/workspace.js`; it calls the validator, dispatches
-known handlers, records undo and returns success/error receipts. `muse_chat.py`
+known handlers, records undo and returns success/error receipts. `homunculus/muse/chat.py`
 issues one Meta Chat Completions request. The browser appends the complete model
 message and matching tool receipts before requesting the next turn. It caps
 the loop at eight turns, rejects stale responses after manual changes, and
