@@ -4,6 +4,11 @@ from pathlib import Path
 import argparse
 import json
 import os
+import re
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from puppet import Edit, run
 from exporter import export_gltf
 from meta import propose, propose_reference, MODEL, configured_key
@@ -13,10 +18,45 @@ from contracts import MAX_DOCUMENT_BYTES, object_value
 import character
 
 ROOT = Path(__file__).parent
+VIDEO_TYPES = {'.mp4':'video/mp4','.webm':'video/webm','.mov':'video/quicktime'}
+CLIPS = ROOT/'private'/'clips'
+MAX_VIDEO_BYTES = 200*1024*1024
+UPLOAD_TYPES = ('.mp4','.webm','.mov','.mkv','.avi','.mpg')  # the worker converts non-mp4 to mp4
+
+
+def latest_clip():
+    found = sorted(CLIPS.glob('*/capture.json'), key=lambda p: p.stat().st_mtime)
+    return found[-1].parent if found else None
+
+
+def worker_call(base, path, data=None, headers=None):
+    request = urllib.request.Request(base.rstrip('/')+path, data=data, headers=headers or {})
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response: return response.read()
+    except urllib.error.HTTPError as exc:
+        raise ValueError('Worker: '+json.loads(exc.read() or b'{}').get('error', str(exc))) from None
+    except OSError as exc:
+        raise RuntimeError(f'SAM worker unreachable at {base} ({exc})') from None
+
+
+def load_clip(path):
+    """A capture.json (or its folder) plus the sibling video whose hash it was recorded from."""
+    import hashlib
+    path = Path(path)
+    if path.is_dir(): path = path/'capture.json'
+    capture = json.loads(path.read_text(encoding='utf-8'))
+    prepare(capture)
+    want = capture['provenance'].get('video_sha256')
+    video = next((v for v in sorted(path.parent.iterdir()) if v.suffix.lower() in VIDEO_TYPES
+                  and hashlib.sha256(v.read_bytes()).hexdigest() == want), None)
+    return {'name':path.parent.name,'capture':capture,'video':video}
 
 
 class Handler(BaseHTTPRequestHandler):
     rig = None  # optional external character (see character.py)
+    clip = None  # optional capture (+ matching source video) preloaded into the editor
+    worker = 'http://127.0.0.1:8766'  # SAM 3D Body job service (worker_service.py)
+    jobs = {}  # worker job id -> local clip folder
 
     def send(self, status, data, content_type='application/json'):
         encoded = json.dumps(data,allow_nan=False).encode() if content_type=='application/json' else data
@@ -35,6 +75,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.local():
             return self.send(403,{'error':'Local origin required'})
+        job = re.fullmatch(r'/api/jobs/([0-9a-f]{32})', self.path)
+        if job:
+            try: return self.send(200,self.job_status(job[1]))
+            except ValueError as exc: return self.send(400,{'error':str(exc)})
+            except RuntimeError as exc: return self.send(503,{'error':str(exc)})
         if self.path == '/api/contracts':
             return self.send(200,{'max_document_bytes':MAX_DOCUMENT_BYTES})
         if self.path == '/api/commands':
@@ -43,6 +88,13 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == '/api/status':
             return self.send(200,{'meta': 'configured; unverified' if configured_key() else 'blocked: no credentials', 'model':MODEL,
                                   'character': self.rig.summary() if self.rig else None})
+        if self.path == '/api/clip':
+            if not self.clip: return self.send(404,{'error':'No clip configured'})
+            return self.send(200,{'name':self.clip['name'],'capture':self.clip['capture'],
+                                  'video':self.clip['video'].name if self.clip['video'] else None})
+        if self.path == '/clip/video':
+            if not (self.clip and self.clip['video']): return self.send(404,{'error':'No clip video'})
+            return self.send(200,self.clip['video'].read_bytes(),VIDEO_TYPES[self.clip['video'].suffix.lower()])
         if self.path == '/character.glb':
             if not self.rig: return self.send(404,{'error':'No character configured'})
             return self.send(200,self.rig.blob,'model/gltf-binary')
@@ -54,10 +106,39 @@ class Handler(BaseHTTPRequestHandler):
         name, mime = paths[self.path]
         self.send(200,(ROOT/'web'/name).read_bytes(),mime)
 
+    def job_status(self, job_id):
+        if job_id not in self.jobs: raise ValueError('Unknown job')
+        status = json.loads(worker_call(self.worker, f'/jobs/{job_id}'))
+        if status['status'] == 'done':
+            folder = self.jobs[job_id]
+            if not (folder/'capture.json').is_file():
+                (folder/(folder.name.split('-',2)[-1]+'.mp4')).write_bytes(worker_call(self.worker, f'/jobs/{job_id}/video.mp4'))
+                (folder/'capture.json').write_bytes(worker_call(self.worker, f'/jobs/{job_id}/capture.json'))
+            Handler.clip = load_clip(folder)  # a page reload now opens this clip
+            status['name'], status['capture'] = folder.name, Handler.clip['capture']
+        return status
+
+    def submit_video(self):
+        """Queue the upload on the SAM worker; the processed mp4 and capture land in private/clips/."""
+        size = int(self.headers.get('Content-Length','0'))
+        if not 0 < size <= MAX_VIDEO_BYTES: raise ValueError(f'Video must be 1–{MAX_VIDEO_BYTES} bytes')
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        name = re.sub(r'[^A-Za-z0-9._-]','_',query.get('name',['clip.mp4'])[0])[-80:]
+        if Path(name).suffix.lower() not in UPLOAD_TYPES: raise ValueError('Use one of '+', '.join(UPLOAD_TYPES))
+        video = self.rfile.read(size)
+        folder = CLIPS/f'{time.strftime("%Y%m%d-%H%M%S")}-{Path(name).stem}'
+        folder.mkdir(parents=True)
+        forward = {k:query[k][0] for k in ('start','seconds','side','bbox') if k in query}
+        reply = json.loads(worker_call(self.worker, '/jobs?'+urllib.parse.urlencode({'name':name,**forward}), video, {'Content-Type':'application/octet-stream'}))
+        self.jobs[reply['id']] = folder
+        return {'id':reply['id'],'seconds':reply['seconds'],'name':folder.name}
+
     def do_POST(self):
         if not self.local():
             return self.send(403,{'error':'Local origin required'})
         try:
+            if urllib.parse.urlparse(self.path).path == '/api/jobs':
+                return self.send(202,self.submit_video())
             size = int(self.headers.get('Content-Length','0'))
             if not 0 < size <= MAX_DOCUMENT_BYTES:
                 raise ValueError(f'Request size must be 1–{MAX_DOCUMENT_BYTES} bytes')
@@ -111,7 +192,8 @@ class Handler(BaseHTTPRequestHandler):
                     import body as full_body
                     if capture is not None and body.get('body') is not False and full_body.body_track(capture) is not None:
                         keys=motion.timeline.document['keyframes'] if getattr(motion,'timeline',None) else None
-                        result['retarget']=full_body.retarget_body(result,self.rig,capture,keys)
+                        if body.get('physics_arm') not in (None,True,False): raise ValueError('physics_arm must be true or false')
+                        result['retarget']=full_body.retarget_body(result,self.rig,capture,keys,physics_arm=body.get('physics_arm') is True)
                     else:
                         result['retarget']=character.retarget(result,self.rig,view=view)
                     payload['character_glb']=character.b64(character.export_character_glb(self.rig,result['retarget'],
@@ -130,7 +212,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port',type=int,default=8765)
     parser.add_argument('--character',help='GLB game character to retarget onto (default: HOMUNCULUS_CHARACTER in the environment or .env.local)')
+    parser.add_argument('--clip',help='capture.json (or its folder) to preview on page load (default: newest processed clip in private/clips); the matching source video beside it is loaded too')
+    parser.add_argument('--worker',default=Handler.worker,help='SAM 3D Body job service URL (default %(default)s)')
     args = parser.parse_args()
+    Handler.worker = args.worker
+    clip = args.clip or latest_clip()
+    if clip:
+        try: Handler.clip = load_clip(clip)
+        except (ValueError,KeyError,TypeError) as exc:
+            if args.clip: raise
+            print(f'Newest clip {clip.name} not loaded: {exc}',flush=True)
+        print(f"Clip: {Handler.clip['name']} (video: {Handler.clip['video'].name if Handler.clip['video'] else 'none matching'})",flush=True)
     path = args.character or character.configured_path()
     if path:
         Handler.rig = character.load_rig(path)

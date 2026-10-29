@@ -24,7 +24,7 @@
 
 <div class="transport"><button id="play" aria-label="Pause playback">Pause</button><input id="timeline" aria-label="Animation time" type="range" min="0" max="1" step=".001" value="0"><output id="time">0.00 / 4.00 s</output></div></div>
 
-</div><div class="legend"><span><i class="dot"></i>Physical arm</span><span><i class="dot target"></i>Intended motion (ghost)</span><span><i class="dot path"></i>Hand path</span><span>▧ Fixed support</span><span id="physics-toggle" hidden><input id="show-physics" type="checkbox"> <label for="show-physics" style="display:inline;margin:0">Show physics arm</label></span><span id="view-toggle" hidden><label for="character-view" style="display:inline;margin:0">Recording view</label> <select id="character-view"><option value="auto">Auto</option><option value="front">Facing camera</option><option value="side">Side-on</option></select></span></div>
+</div><div class="legend"><span><i class="dot"></i>Physical arm</span><span><i class="dot target"></i>Intended motion (ghost)</span><span><i class="dot path"></i>Hand path</span><span>▧ Fixed support</span><span id="physics-toggle" hidden><input id="show-physics" type="checkbox"> <label for="show-physics" style="display:inline;margin:0">Show physics arm</label> <input id="physics-arm" type="checkbox"> <label for="physics-arm" style="display:inline;margin:0">Drive arm from physics</label></span><span id="view-toggle" hidden><label for="character-view" style="display:inline;margin:0">Recording view</label> <select id="character-view"><option value="auto">Auto</option><option value="front">Facing camera</option><option value="side">Side-on</option></select></span></div>
 
 <div class="metrics"><div class="metric"><span>Tracking error</span><strong id="error">—</strong><span>RMS across joint axes</span></div><div class="metric"><span>Contact</span><strong id="contact">—</strong><span>Physics steps touching</span></div><div class="metric"><span>Simulation time</span><strong id="speed">—</strong><span>For the complete clip</span></div></div>
 
@@ -37,6 +37,12 @@
 
 
 </main><aside><section><div class="eyebrow">00 / Reference</div><h3 style="margin-top:12px">Bring a performance</h3>
+
+<label for="process-file">Process a video with SAM 3D Body</label><input id="process-file" type="file" accept="video/*,.mp4,.webm,.mov,.mkv,.avi,.mpg">
+
+<label for="process-start">Start at (s)</label><input id="process-start" type="number" min="0" step="0.1" value="0">
+
+<p id="job-status" class="note" role="status">Choose a clip (up to 30 s from Start at; .mkv and other formats are converted to mp4). The GPU worker finds the person, reconstructs the body, and the whole skeleton is retargeted automatically.</p>
 
 <label for="video-file">Preview your video locally</label><input id="video-file" type="file" accept="video/*">
 

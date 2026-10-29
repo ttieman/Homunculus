@@ -79,7 +79,9 @@ def prepare_spatial(bundle):
     poses=np.array(poses)
     delta=2*np.arccos(np.clip(np.abs(np.sum(poses[1:,:4]*poses[:-1,:4],axis=1)),0,1))
     speed=np.maximum(delta,np.abs(np.diff(poses[:,4])))/np.diff(times)
-    if np.max(speed)>np.radians(720): raise ValueError('Pose discontinuity exceeds 720 deg/s; inspect source')
+    # Full-body captures keep fast raw arm steps as a warning; the smoothed reference below still enforces 720 deg/s.
+    jumps=[round(float(times[i+1]),3) for i in np.flatnonzero(speed>np.radians(720))]
+    if jumps and 'body_keypoints' not in bundle: raise ValueError('Pose discontinuity exceeds 720 deg/s; inspect source')
     raw=poses.copy()
     for i,t in enumerate(times[1:-1],1):
         neighbors=raw[np.abs(times-t)<=.09].copy()
@@ -89,7 +91,7 @@ def prepare_spatial(bundle):
         'bundle_sha256':hashlib.sha256(json.dumps(bundle,sort_keys=True,allow_nan=False).encode()).hexdigest(),
         'mapping':'spatial_arm_v1; fixed shoulder, normalized lengths, bend-plane twist convention',
         'smoothing':'90 ms quaternion hemisphere mean, normalized; endpoints preserved',
-        'near_straight_frames':singular,'missing_frames':0,'max_angular_speed_deg_s':float(np.degrees(max(speed))),
+        'near_straight_frames':singular,'missing_frames':0,'raw_arm_jumps_over_720_deg_s_at':jumps,'max_angular_speed_deg_s':float(np.degrees(max(speed))),
         'inference':'SAM_RECONSTRUCTION_UNVERIFIED_ACCURACY' if provenance['kind']=='sam3d' else 'NOT_RUN_SYNTHETIC_TEST'})
     from quality import capture_quality
     motion.metadata['capture_quality']=capture_quality(bundle)

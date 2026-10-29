@@ -1,7 +1,8 @@
 """Offline SAM worker. Run inside the official SAM 3D Body environment.
 
-No downloads, credentials, detector, remote API, or background service changes.
-One stationary person inside an explicitly selected fixed bounding box.
+No credentials, remote API, or background service changes.
+One stationary person inside a fixed bounding box: given with --bbox, or found with
+--detect (SAM 3D Body's ViTDet human detector on a few frames spread over the clip).
 """
 import argparse
 import hashlib
@@ -20,6 +21,30 @@ def sha256(path):
     return digest.hexdigest()
 
 
+def detect_box(args,p,probes=8,pad=.1):
+    """One fixed ROI covering the main person across the capture window."""
+    import cv2
+    import numpy as np
+    import torch
+    from tools.build_detector import HumanDetector
+    detector=HumanDetector('vitdet',device='cuda',path=str(args.detect))
+    video=cv2.VideoCapture(str(args.video))
+    fps=video.get(cv2.CAP_PROP_FPS) or 30;count=int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+    first=int(args.start*fps);last=min(count-1,int((args.start+args.seconds)*fps))
+    boxes=[]
+    for index in np.linspace(first,max(first,last),probes).round().astype(int):
+        video.set(cv2.CAP_PROP_POS_FRAMES,int(index));ok,bgr=video.read()
+        if not ok: continue
+        h,w=bgr.shape[:2]
+        found=detector.run_human_detection(bgr,default_to_full_image=False)
+        if len(found): boxes.append(max(found,key=lambda b:(b[2]-b[0])*(b[3]-b[1])))
+    video.release()
+    del detector;torch.cuda.empty_cache()
+    if not boxes: p.error('No person detected; pass --bbox')
+    b=np.array(boxes);x1,y1=b[:,:2].min(0);x2,y2=b[:,2:].max(0);dx,dy=(x2-x1)*pad,(y2-y1)*pad
+    return [float(max(0,x1-dx)),float(max(0,y1-dy)),float(min(w,x2+dx)),float(min(h,y2+dy))]
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('video',type=Path)
@@ -27,7 +52,8 @@ def main():
     p.add_argument('--checkpoint',type=Path,required=True)
     p.add_argument('--mhr',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True)
-    p.add_argument('--bbox',type=float,nargs=4,required=True,metavar=('X1','Y1','X2','Y2'))
+    p.add_argument('--bbox',type=float,nargs=4,metavar=('X1','Y1','X2','Y2'))
+    p.add_argument('--detect',type=Path,metavar='VITDET_DIR',help='Find the person instead of --bbox; directory holding model_final_f05665.pkl')
     p.add_argument('--basis',type=float,nargs=9,required=True,help='Row-major native-to-puppet proper rotation, verified in preview')
     p.add_argument('--spatial',action='store_true',help='Capture up to 30 seconds for spatial arm synthesis')
     p.add_argument('--side',choices=['right','left'],default='right')
@@ -42,6 +68,7 @@ def main():
     for name in ('video','checkpoint','mhr'):
         if not getattr(args,name).is_file(): p.error(f'BLOCKED: {name} file unavailable')
     if args.output.exists(): p.error('Output already exists; choose a new directory')
+    if (args.bbox is None)==(args.detect is None): p.error('Give exactly one of --bbox or --detect')
     sys.path.insert(0,str(args.sam_root.resolve()))
     import cv2
     import numpy as np
@@ -55,6 +82,11 @@ def main():
         p.error('basis must be a proper orthonormal rotation')
     revision=subprocess.check_output(['git','-C',str(args.sam_root),'rev-parse','HEAD'],text=True).strip()
     args.output.mkdir(parents=True)
+    identity='user-selected single-person fixed ROI; no automatic identity tracking'
+    if args.detect:
+        args.bbox=detect_box(args,p)
+        identity='ViTDet largest person per probe frame, union of 8 probes padded 10%; no identity tracking'
+        print(f'Detected person box {[round(v) for v in args.bbox]}',flush=True)
     model,cfg=load_sam_3d_body(str(args.checkpoint),device='cuda',mhr_path=str(args.mhr))
     estimator=SAM3DBodyEstimator(model,cfg)
     indices=[mhr_names.index(f'{args.side}-{part}') for part in ('shoulder','elbow','wrist')]
@@ -101,7 +133,7 @@ def main():
             'checkpoint_sha256':sha256(args.checkpoint),'mhr_sha256':sha256(args.mhr),
             'video_sha256':sha256(args.video),'side':args.side,'bbox':args.bbox,
             'image_size_px':image_size,
-            'identity':'user-selected single-person fixed ROI; no automatic identity tracking',
+            'identity':identity,
             'native_units':'unverified; directions only','camera':'default FOV; not metric calibration',
             'requested_sample_hz':args.sample_hz,
             'achieved_sample_hz':(len(records)-1)/(records[-1]['t']-records[0]['t']) if len(records)>1 else 0,

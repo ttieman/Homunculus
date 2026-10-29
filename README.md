@@ -34,6 +34,26 @@ pan, double-click to reset. three.js is vendored as `web/vendor/three.js`, so th
 editor runs offline; after changing `web/vendor/three-entry.js`, rebuild it with
 `npm ci && npm run build:three`.
 
+### Process a video
+
+**Process a video with SAM 3D Body** uploads a clip (2.1–30 s from its start) to the
+GPU worker, which detects the person (ViTDet, union box over 8 probe frames), runs SAM
+3D Body at 15 Hz and returns a capture with all 70 body keypoints. The editor then
+retargets the whole skeleton automatically and keeps the clip in ignored
+`private/clips/<time>-<name>/`; the newest one opens on every page load (`--clip`
+overrides). The captured arm follows the recording; tick **Drive arm from physics**
+to substitute the simulated arm.
+
+The worker is `worker_service.py`, run from the SAM environment on the GPU node:
+
+```
+.venv/bin/python worker_service.py --host 127.0.0.1 --port 8766
+```
+
+It queues one job at a time through the node's GPU lock (`with-gpu.sh`, exit 75 =
+busy, retried). The editor server reaches it at `--worker` (default
+`http://127.0.0.1:8766`, e.g. through an SSH tunnel).
+
 ### Your game character
 
 Point the server at a GLB character and the editor poses it with the result, and

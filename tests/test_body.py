@@ -162,7 +162,8 @@ def test_uncaptured_bones_recover_the_exact_pose(rig, scenario):
 
 
 def test_captured_arm_follows_physics_directions(rig, scenario):
-    capture, truth, result, retargeted = scenario
+    capture, truth, result, _ = scenario
+    retargeted = retarget_body(result, rig, capture, prepare_spatial(capture).timeline.document['keyframes'], sigma=0, physics_arm=True)
     glb = export_character_glb(rig, retargeted)
     times, world = replay_pose(glb)
     worst = 0
@@ -172,6 +173,15 @@ def test_captured_arm_follows_physics_directions(rig, scenario):
         for a, b in ((u, d1), (f, d2)):
             worst = max(worst, np.degrees(np.arccos(np.clip(np.dot(a, b) / np.linalg.norm(a) / np.linalg.norm(b), -1, 1))))
     assert worst < .05
+
+
+def test_captured_arm_follows_the_capture_by_default(rig, scenario):
+    capture, truth, result, retargeted = scenario
+    physics = retarget_body(result, rig, capture, prepare_spatial(capture).timeline.document['keyframes'], sigma=0, physics_arm=True)
+    arm = [retargeted['bones'].index(b) for b in ('upper_arm.L', 'forearm.L')]
+    differs = any(not np.allclose(a['rotations_xyzw'][i], b['rotations_xyzw'][i], atol=1e-6)
+                  for a, b in zip(retargeted['frames'], physics['frames']) for i in arm)
+    assert differs  # the default arm is the observed one, not the physics substitution
 
 
 def test_export_replays_every_joint_and_the_pelvis_height(rig, scenario):

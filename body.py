@@ -214,8 +214,9 @@ def leg_length(p, side):
     return np.linalg.norm(p[f'{side}-knee'] - p[f'{side}-hip']) + np.linalg.norm(p[f'{side}-ankle'] - p[f'{side}-knee'])
 
 
-def retarget_body(result, rig, capture, keys=None, sigma=SMOOTH_SIGMA_S):
-    """Every bone of the rig, sampled at the result's frame times. keys: the timeline keyframes used."""
+def retarget_body(result, rig, capture, keys=None, sigma=SMOOTH_SIGMA_S, physics_arm=False):
+    """Every bone of the rig, sampled at the result's frame times. keys: the timeline keyframes used.
+    physics_arm: drive the captured arm from the physics result instead of the capture."""
     check_rig(rig)
     track = body_track(capture)
     if track is None:
@@ -228,7 +229,7 @@ def retarget_body(result, rig, capture, keys=None, sigma=SMOOTH_SIGMA_S):
     side = 'L' if (capture.get('provenance') or {}).get('side') == 'left' else 'R'
     arm = SIDES[side]
 
-    # Body keypoints at each result frame (linear in source time), with the physics arm substituted.
+    # Body keypoints at each result frame (linear in source time), optionally with the physics arm substituted.
     sampled = []
     for frame in frames:
         st = source_time(keys, duration, frame['t']) if keys else None
@@ -238,7 +239,7 @@ def retarget_body(result, rig, capture, keys=None, sigma=SMOOTH_SIGMA_S):
         q = (1 - u) * pts[i] + u * pts[i + 1]
         p = {n: q[index[n]] for n in REQUIRED + [n for n in LEG_POINTS if n in index]}
         derive(p)
-        if 'elbow' in frame and 'hand' in frame:
+        if physics_arm and 'elbow' in frame and 'hand' in frame:
             d1 = unit(np.asarray(frame['elbow']) - [0, 1.4, 0], 'physics upper arm')
             d2 = unit(np.asarray(frame['hand']) - np.asarray(frame['elbow']), 'physics forearm')
             shoulder, elbow, wrist = p[f'{arm}-shoulder'], p[f'{arm}-elbow'], p[f'{arm}-wrist']
