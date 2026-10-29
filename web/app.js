@@ -1,5 +1,16 @@
 import { createStage } from './stage3d.js';
 import { createWorkspace } from './workspace.js';
+import { processVideo } from './jobs.js';
+import {
+  armPoints,
+  quaternionArm,
+  readAccessor,
+  sampleFrames,
+  sampleRig,
+  sampleTranslation,
+  targetPoints,
+} from './motion-math.js';
+import { formatSegments } from './segments.js';
 const $ = id => document.getElementById(id);
 const names = ['duration', 'shoulder_deg', 'elbow_deg', 'strength', 'damping'];
 let current = null,
@@ -179,7 +190,6 @@ async function editReference(three = false, save = false) {
 }
 $('three-poses').onclick = () => editReference(true);
 $('save-reference').onclick = () => editReference(false, true);
-$('edit-key').onclick = () => editReference();
 $('apply').onclick = () => simulate(fields());
 $('optimize').onclick = () =>
   simulate(fields(), 'bounded controller optimization', true, activeCapture, true);
@@ -330,27 +340,6 @@ $('capture-file').onchange = async () => {
     reviewReady();
   }
 };
-$('use-capture').onclick = async () => {
-  if (!pendingCapture || !$('review-capture').checked || hashingVideo) return;
-  if (videoURL && !videoHash) {
-    $('capture-status').textContent =
-      'Video hash could not be verified. Reload and reselect the source video.';
-    return;
-  }
-  if (videoHash && pendingCapture.provenance.video_sha256 !== videoHash) {
-    $('capture-status').textContent =
-      'Video hash mismatch. Capture must belong to the selected source video.';
-    return;
-  }
-  const frames = pendingCapture.frames;
-  const duration = pendingCapture.reference_animation?.keyframes.at(-1).time ?? frames.at(-1).t - frames[0].t;
-  await simulate(
-    { ...fields(), duration: duration, obstacle: false },
-    'imported capture',
-    true,
-    pendingCapture,
-  );
-};
 $('character-view').onchange = () => {
   if (current && !busy) simulate(current, 'recording view', false, activeCapture);
 };
@@ -358,17 +347,6 @@ $('physics-arm').onchange = () => {
   if (current && !busy) simulate(current, 'physics arm toggle', false, activeCapture);
 };
 $('use-fixture').onclick = () => simulate(fields(), 'procedural fixture', true, null);
-function readAccessor(doc, index, width) {
-  const a = doc.accessors[index],
-    v = doc.bufferViews[a.bufferView];
-  const bytes = Uint8Array.from(atob(doc.buffers[v.buffer].uri.split(',')[1]), c => c.charCodeAt(0));
-  const view = new DataView(bytes.buffer);
-  return Array.from({ length: a.count }, (_, i) =>
-    Array.from({ length: width }, (_, j) =>
-      view.getFloat32((v.byteOffset || 0) + (a.byteOffset || 0) + (i * width + j) * 4, true),
-    ),
-  );
-}
 $('replay').onclick = async () => {
   if (!gltf) return;
   exported = !exported;
@@ -402,94 +380,6 @@ $('play').onclick = () => {
 $('timeline').oninput = () => {
   if (current) cursor = Number($('timeline').value) * current.duration;
 };
-function slerp(a, b, u) {
-  let dot = a.reduce((v, x, i) => v + x * b[i], 0);
-  if (dot < 0) {
-    b = b.map(x => -x);
-    dot = -dot;
-  }
-  let q;
-  if (dot > 0.9995) {
-    q = a.map((x, i) => (1 - u) * x + u * b[i]);
-  } else {
-    const angle = Math.acos(Math.min(1, dot));
-    q = a.map((x, i) => (Math.sin((1 - u) * angle) * x + Math.sin(u * angle) * b[i]) / Math.sin(angle));
-  }
-  const n = Math.hypot(...q);
-  return q.map(x => x / n);
-}
-function rigFrames(frames, t) {
-  let lo = 0,
-    hi = frames.length - 1;
-  while (lo + 1 < hi) {
-    const mid = (lo + hi) >> 1;
-    if (frames[mid].t <= t) lo = mid;
-    else hi = mid;
-  }
-  const a = frames[lo],
-    b = frames[hi];
-  return [a, b, t >= b.t ? 1 : Math.max(0, (t - a.t) / (b.t - a.t))];
-}
-function sampleRig(frames, t) {
-  const [a, b, u] = rigFrames(frames, t);
-  return a.rotations_xyzw.map((q, i) => slerp(q, b.rotations_xyzw[i], u));
-}
-function sampleTranslation(frames, t) {
-  const [a, b, u] = rigFrames(frames, t);
-  return a.translation ? a.translation.map((x, i) => x + (b.translation[i] - x) * u) : null;
-}
-function sampleFrames(frames, t) {
-  let lo = 0,
-    hi = frames.length - 1;
-  while (lo + 1 < hi) {
-    const mid = (lo + hi) >> 1;
-    if (frames[mid].t <= t) lo = mid;
-    else hi = mid;
-  }
-  if (t >= frames.at(-1).t) return frames.at(-1);
-  const a = frames[lo],
-    b = frames[hi],
-    u = Math.max(0, (t - a.t) / (b.t - a.t));
-  const out = { ...a };
-  for (const k of ['q', 'target', 'elbow', 'hand', 'target_elbow', 'target_hand'])
-    if (a[k]) out[k] = a[k].map((x, i) => x + (b[k][i] - x) * u);
-  if (a.rotations) {
-    out.rotations = a.rotations.map((q, i) => slerp(q, b.rotations[i], u));
-    Object.assign(out, quaternionArm(out.rotations));
-    out.q = out.rotations.map(q => 2 * Math.atan2(q[2], q[3]));
-  }
-  return out;
-}
-function rotate(q, v) {
-  const [x, y, z, w] = q;
-  const t = [2 * (y * v[2] - z * v[1]), 2 * (z * v[0] - x * v[2]), 2 * (x * v[1] - y * v[0])];
-  return [
-    v[0] + w * t[0] + y * t[2] - z * t[1],
-    v[1] + w * t[1] + z * t[0] - x * t[2],
-    v[2] + w * t[2] + x * t[1] - y * t[0],
-  ];
-}
-function quaternionArm(q) {
-  const a = rotate(q[0], [0.34, 0, 0]);
-  const b = rotate(q[0], rotate(q[1], [0.29, 0, 0]));
-  return { elbow: [a[0], 1.4 + a[1], a[2]], hand: [a[0] + b[0], 1.4 + a[1] + b[1], a[2] + b[2]] };
-}
-// Planar results carry joint angles only; place them in the Z=0 plane of the 3D world.
-function planarArm(q) {
-  const elbow = [0.34 * Math.cos(q[0]), 1.4 + 0.34 * Math.sin(q[0]), 0];
-  return {
-    elbow,
-    hand: [elbow[0] + 0.29 * Math.cos(q[0] + q[1]), elbow[1] + 0.29 * Math.sin(q[0] + q[1]), 0],
-  };
-}
-function armPoints(f) {
-  return f.elbow && f.hand ? { elbow: f.elbow, hand: f.hand } : planarArm(f.q);
-}
-function targetPoints(f) {
-  return f.target_elbow && f.target_hand
-    ? { elbow: f.target_elbow, hand: f.target_hand }
-    : planarArm(f.target);
-}
 let stage = null,
   pathSource = null;
 try {
@@ -631,23 +521,7 @@ async function segmentCommand(operation) {
   return { segments: payload.segments, physicsArm: $('physics-arm').checked };
 }
 function showSegments() {
-  const list = activeCapture?.timing?.segments || [];
-  $('segment-list').textContent = list.length
-    ? list
-        .map(
-          s =>
-            s.id +
-            ': ' +
-            s.start.toFixed(2) +
-            '–' +
-            s.end.toFixed(2) +
-            ' s' +
-            ('strength' in s ? ' · strength ' + s.strength : '') +
-            ('damping' in s ? ' · damping ' + s.damping : '') +
-            (s.blend ? ' · blend ' + s.blend + ' s ' + s.curve : ''),
-        )
-        .join(String.fromCharCode(10))
-    : 'No segments.';
+  $('segment-list').textContent = formatSegments(activeCapture?.timing?.segments || []);
 }
 async function requireSimulation(edit = current, capture = activeCapture, optimize = false) {
   if (!(await simulate(edit, 'workspace command', false, capture, optimize)))
@@ -889,32 +763,9 @@ $('process-file').onchange = async () => {
   if (!f) return;
   const status = $('job-status');
   try {
-    status.textContent = 'Uploading ' + f.name + '…';
-    const r = await fetch(
-      '/api/jobs?name=' + encodeURIComponent(f.name) + '&start=' + Number($('process-start').value || 0),
-      { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: f },
-    );
-    const job = await r.json();
-    if (!r.ok) throw Error(job.error || 'Upload failed');
-    const started = performance.now();
-    let s;
-    do {
-      await new Promise(done => setTimeout(done, 2000));
-      const p = await fetch('/api/jobs/' + job.id);
-      s = await p.json();
-      if (!p.ok) throw Error(s.error || 'Job status failed');
-      status.textContent =
-        s.status +
-        ' · ' +
-        s.message +
-        (s.frames ? ' · frame ' + s.frames + '/' + s.expected_frames : '') +
-        ' · ' +
-        Math.round((performance.now() - started) / 1000) +
-        ' s' +
-        (s.log?.length && !s.frames ? ' · ' + s.log.at(-1) : '');
-    } while (!['done', 'failed'].includes(s.status));
-    if (s.status === 'failed')
-      throw Error(s.message + (s.log?.length ? ': ' + s.log.slice(-3).join(' | ') : ''));
+    const { job, s, started } = await processVideo(f, Number($('process-start').value || 0), text => {
+      status.textContent = text;
+    });
     const blob = await (await fetch('/clip/video')).blob();
     await loadVideo(new File([blob], s.name + '.mp4', { type: 'video/mp4' })); // the exact video SAM ran on
     await applyClip(s.capture, s.name);

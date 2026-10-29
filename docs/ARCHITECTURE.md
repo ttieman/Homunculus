@@ -16,12 +16,12 @@ video ──► worker/ ──────► homunculus/capture ──► homun
 | Folder | What it is | Start reading at |
 |---|---|---|
 | `server.py` | Launcher for the editor (`python server.py`) | — |
-| `web/` | Browser editor: UI (`index.html`, `app.js`), 3D stage (`stage3d.js`), command dispatch + undo (`workspace.js`) | `app.js` |
+| `web/` | Browser editor: UI (`index.html`), state and wiring (`app.js`), 3D stage (`stage3d.js`), command dispatch + undo (`workspace.js`), SAM upload + job polling (`jobs.js`), frame sampling and arm placement (`motion-math.js`), segment list text (`segments.js`). New `web/*.js` files must be added to the server's file list in `editor/server.py` | `app.js` |
 | `homunculus/editor/` | Local HTTP server (`server.py`: every `/api/...` route) and the workspace command catalog shared by buttons and Muse (`commands.py`) | `server.py` `do_POST` |
 | `homunculus/capture/` | Capture bundle (`homunculus.observations.v1`) → motion. `prepare.py` picks the path; `spatial.py` (3D arm, the one in use) or `planar.py` (original side-on arm); `quality.py` diagnostics | `prepare.py` |
 | `homunculus/physics/` | MuJoCo simulation. `settings.py` (the `Edit` authoring values), `simulate.py` (picks the arm), `spatial.py` (3D arm + gain search), `planar.py` (original arm) | `simulate.py` |
 | `homunculus/animation/` | Editable timing: `timeline.py` (keyframes, output→source time), `segments.py` (per-range physics), `pose_editor.py` (joint edits) | `timeline.py` |
-| `homunculus/retarget/` | Onto the game character: `body.py` (whole skeleton from 70 body keypoints), `character.py` (GLB read/write, arm-only retarget, export) | `body.py` `retarget_body` |
+| `homunculus/retarget/` | Onto the game character: `body.py` (whole skeleton from 70 body keypoints), `rig.py` (load the GLB character), `arm.py` (arm-only retarget), `character_glb.py` (write/replay the posed GLB), `geometry.py` (quaternions) | `body.py` `retarget_body` |
 | `homunculus/export/` | `gltf.py` (physics result → glTF + replay), `assets.py` (versioned, checksummed motion assets) | `gltf.py` |
 | `homunculus/muse/` | Meta's hosted model: `meta.py` (API access, edit proposals), `chat.py` (one chat turn with tool calls) | `chat.py` |
 | `homunculus/contracts.py` | Shared limits (frames, duration, request size) and validators | — |

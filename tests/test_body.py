@@ -6,7 +6,9 @@ import pytest
 
 from homunculus.retarget import body
 from homunculus.retarget.body import BODY_BONES, MHR70, retarget_body
-from homunculus.retarget.character import Rig, export_character_glb, qmat, qmul, read_glb, replay_pose
+from homunculus.retarget.character_glb import export_character_glb, replay_pose
+from homunculus.retarget.geometry import qmat, qmul
+from homunculus.retarget.rig import Rig, read_glb
 from character_fixture import build
 from homunculus.physics.settings import Edit
 from homunculus.capture.spatial import prepare_spatial

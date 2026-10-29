@@ -74,7 +74,7 @@ character's left/up/forward; **side-on** (planar captures and the demo) makes th
 reach direction the character's forward. Override it with **Recording view**. Only arm directions transfer;
 the character keeps its own (shorter) proportions and rest body pose, so its hand
 can stop short of where the physics hand touched. Tick **Show physics arm** to
-compare. See `homunculus/retarget/character.py` for the exact conventions.
+compare. See `homunculus/retarget/rig.py` and `arm.py` for the exact conventions.
 
 **Full skeleton.** Captures that carry SAM's 70 body keypoints drive all 19
 moving bones (pelvis, spine, chest, neck, head, clavicles, arms, hands, legs and

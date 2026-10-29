@@ -4,7 +4,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import argparse
 import json
-import os
 import re
 import time
 import urllib.error
@@ -17,7 +16,10 @@ from homunculus.export.gltf import export_gltf
 from homunculus.muse.meta import propose, propose_reference, MODEL, configured_key
 from homunculus.physics.settings import Edit
 from homunculus.physics.simulate import run
-from homunculus.retarget import character
+from homunculus.retarget import body as full_body
+from homunculus.retarget.arm import VIEWS, retarget as retarget_arm
+from homunculus.retarget.character_glb import b64, export_character_glb
+from homunculus.retarget.rig import configured_path, load_rig
 
 VIDEO_TYPES = {'.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime'}
 CLIPS = ROOT / 'private' / 'clips'
@@ -63,7 +65,7 @@ def load_clip(path):
 
 
 class Handler(BaseHTTPRequestHandler):
-    rig = None  # optional external character (see character.py)
+    rig = None  # optional external character (see retarget/rig.py)
     clip = None  # optional capture (+ matching source video) preloaded into the editor
     worker = 'http://127.0.0.1:8766'  # SAM 3D Body job service (worker_service.py)
     jobs = {}  # worker job id -> local clip folder
@@ -138,6 +140,9 @@ class Handler(BaseHTTPRequestHandler):
             '/app.js': ('app.js', js),
             '/stage3d.js': ('stage3d.js', js),
             '/workspace.js': ('workspace.js', js),
+            '/jobs.js': ('jobs.js', js),
+            '/motion-math.js': ('motion-math.js', js),
+            '/segments.js': ('segments.js', js),
             '/vendor/three.js': ('vendor/three.js', js),
         }
         if self.path not in paths:
@@ -233,7 +238,6 @@ class Handler(BaseHTTPRequestHandler):
                 )
             if self.path == '/api/capture/validate':
                 motion = prepare(body['capture'])
-                from homunculus.retarget import body as full_body
 
                 track = full_body.body_track(body['capture'])
                 return self.send(
@@ -281,12 +285,11 @@ class Handler(BaseHTTPRequestHandler):
                 payload = {'result': result, 'gltf': export_gltf(result)}
                 if self.rig:
                     view = body.get('view')
-                    if view is not None and view not in character.VIEWS:
-                        raise ValueError('view must be one of ' + ', '.join(sorted(character.VIEWS)))
+                    if view is not None and view not in VIEWS:
+                        raise ValueError('view must be one of ' + ', '.join(sorted(VIEWS)))
                     if body.get('body') not in (None, True, False):
                         raise ValueError('body must be true or false')
                     capture = body.get('capture')
-                    from homunculus.retarget import body as full_body
 
                     if (
                         capture is not None
@@ -304,9 +307,9 @@ class Handler(BaseHTTPRequestHandler):
                             result, self.rig, capture, keys, physics_arm=body.get('physics_arm') is True
                         )
                     else:
-                        result['retarget'] = character.retarget(result, self.rig, view=view)
-                    payload['character_glb'] = character.b64(
-                        character.export_character_glb(
+                        result['retarget'] = retarget_arm(result, self.rig, view=view)
+                    payload['character_glb'] = b64(
+                        export_character_glb(
                             self.rig,
                             result['retarget'],
                             {
@@ -375,9 +378,9 @@ def main():
                 f"Clip: {Handler.clip['name']} (video: {Handler.clip['video'].name if Handler.clip['video'] else 'none matching'})",
                 flush=True,
             )
-    path = args.character or character.configured_path()
+    path = args.character or configured_path()
     if path:
-        Handler.rig = character.load_rig(path)
+        Handler.rig = load_rig(path)
         print(f'Character: {Handler.rig.source}', flush=True)
     print(f'Homunculus editor: http://127.0.0.1:{args.port}', flush=True)
     ThreadingHTTPServer(('127.0.0.1', args.port), Handler).serve_forever()

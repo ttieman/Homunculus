@@ -3,7 +3,6 @@
 Writes nothing unless run as a script (CI writes outputs/test-character.glb for the browser test).
 """
 
-import math
 import struct
 import sys
 from pathlib import Path
@@ -11,7 +10,8 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from homunculus.retarget.character import mat_q, qinv, qmul, write_glb  # noqa: E402
+from homunculus.retarget.geometry import mat_q, qinv, qmul  # noqa: E402
+from homunculus.retarget.rig import write_glb  # noqa: E402
 
 
 def aim(direction, roll_hint=(0, 0, 1)):
@@ -35,7 +35,7 @@ def build(drop_bone=None):
             t, r = np.array(head, float), rot
         else:
             ph, pr = world[parent]
-            from homunculus.retarget.character import qmat
+            from homunculus.retarget.geometry import qmat
 
             t = qmat(qinv(pr)) @ (np.array(head, float) - ph)
             r = qmul(qinv(pr), rot)
@@ -78,7 +78,7 @@ def build(drop_bone=None):
         jidx += [[j, 0, 0, 0]] * 3
         weights += [[1, 0, 0, 0]] * 3
         h, r = world[index]
-        from homunculus.retarget.character import qmat
+        from homunculus.retarget.geometry import qmat
 
         m = np.eye(4)
         m[:3, :3] = qmat(r)

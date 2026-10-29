@@ -9,17 +9,10 @@ from http.server import ThreadingHTTPServer
 import numpy as np
 import pytest
 
-from homunculus.retarget import character
-from homunculus.retarget.character import (
-    Rig,
-    export_character_glb,
-    mapping,
-    puppet_arm,
-    read_glb,
-    replay_character,
-    retarget,
-    to_character,
-)
+from homunculus.retarget.rig import configured_path
+from homunculus.retarget.arm import mapping, puppet_arm, retarget, to_character
+from homunculus.retarget.character_glb import export_character_glb, replay_character
+from homunculus.retarget.rig import Rig, read_glb
 from character_fixture import build
 from homunculus.physics.settings import Edit
 from homunculus.physics.simulate import run
@@ -132,11 +125,11 @@ def test_rejects_unsupported_characters():
 
 def test_configured_path_reads_env_local(tmp_path, monkeypatch):
     monkeypatch.delenv('HOMUNCULUS_CHARACTER', raising=False)
-    assert character.configured_path(tmp_path) is None
+    assert configured_path(tmp_path) is None
     (tmp_path / '.env.local').write_text('MODEL_API_KEY=x\nHOMUNCULUS_CHARACTER="C:/game/stickman.glb"\n')
-    assert character.configured_path(tmp_path) == 'C:/game/stickman.glb'
+    assert configured_path(tmp_path) == 'C:/game/stickman.glb'
     monkeypatch.setenv('HOMUNCULUS_CHARACTER', '/env/wins.glb')
-    assert character.configured_path(tmp_path) == '/env/wins.glb'
+    assert configured_path(tmp_path) == '/env/wins.glb'
 
 
 def test_server_serves_character_and_retargets_simulations(rig):

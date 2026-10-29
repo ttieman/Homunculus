@@ -112,9 +112,9 @@ name the clip after the source, and verify playback in `bevy-playground`
 * **Consolidate** — venv and clips into this repo's folder; retire the
   force-puppet checkout; permanent worker service on the GPU node (systemd unit,
   grA's call) instead of the SSH-session runner.
-* **Readability** — code is formatted (Black / Prettier, 2026-10-28); still to do:
-  split `retarget/character.py` (GLB I/O, quaternions, arm retarget) and `web/app.js`
-  (upload/jobs, segments, playback, export) into smaller files.
+* **Readability** — formatted (Black / Prettier) and split (`retarget/character.py` →
+  geometry/rig/arm/character_glb; pure parts of `web/app.js` → jobs/motion-math/segments),
+  2026-10-29. `app.js` still owns all editor state in one module.
 * **Speed** — sample rate choice per job; overlapping conversion with inference.
 
 ## Open questions
