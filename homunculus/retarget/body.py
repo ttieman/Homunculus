@@ -19,6 +19,7 @@ Coordinates: capture keypoints use the capture's basis (X image-right, Y up, Z t
 the camera). The character faces +Z with its left side on +X, so a person facing the
 camera maps with the identity; turning away from the camera shows as pelvis yaw.
 """
+
 import numpy as np
 
 from homunculus.retarget.character import mat_q, qmat, unit
@@ -26,48 +27,103 @@ from homunculus.animation.timeline import source_time
 
 # Official SAM 3D Body (MHR70) keypoint names, facebookresearch/sam-3d-body
 # sam_3d_body/metadata/mhr70.py at b5c765a. Captures carry their own list; lookups are by name.
-MHR70 = ['nose', 'left-eye', 'right-eye', 'left-ear', 'right-ear', 'left-shoulder', 'right-shoulder',
-         'left-elbow', 'right-elbow', 'left-hip', 'right-hip', 'left-knee', 'right-knee', 'left-ankle',
-         'right-ankle', 'left-big-toe-tip', 'left-small-toe-tip', 'left-heel', 'right-big-toe-tip',
-         'right-small-toe-tip', 'right-heel'] + \
-    [f'right-{f}' for f in ('thumb-tip', 'thumb-first-joint', 'thumb-second-joint', 'thumb-third-joint')] + \
-    [f'right-{d}-{p}' for d in ('index', 'middle', 'ring', 'pinky') for p in ('tip', 'first-joint', 'second-joint', 'third-joint')] + \
-    ['right-wrist'] + \
-    [f'left-{f}' for f in ('thumb-tip', 'thumb-first-joint', 'thumb-second-joint', 'thumb-third-joint')] + \
-    [f'left-{d}-{p}' for d in ('index', 'middle', 'ring', 'pinky') for p in ('tip', 'first-joint', 'second-joint', 'third-joint')] + \
-    ['left-wrist', 'left-olecranon', 'right-olecranon', 'left-cubital-fossa', 'right-cubital-fossa',
-     'left-acromion', 'right-acromion', 'neck']
+MHR70 = (
+    [
+        'nose',
+        'left-eye',
+        'right-eye',
+        'left-ear',
+        'right-ear',
+        'left-shoulder',
+        'right-shoulder',
+        'left-elbow',
+        'right-elbow',
+        'left-hip',
+        'right-hip',
+        'left-knee',
+        'right-knee',
+        'left-ankle',
+        'right-ankle',
+        'left-big-toe-tip',
+        'left-small-toe-tip',
+        'left-heel',
+        'right-big-toe-tip',
+        'right-small-toe-tip',
+        'right-heel',
+    ]
+    + [f'right-{f}' for f in ('thumb-tip', 'thumb-first-joint', 'thumb-second-joint', 'thumb-third-joint')]
+    + [
+        f'right-{d}-{p}'
+        for d in ('index', 'middle', 'ring', 'pinky')
+        for p in ('tip', 'first-joint', 'second-joint', 'third-joint')
+    ]
+    + ['right-wrist']
+    + [f'left-{f}' for f in ('thumb-tip', 'thumb-first-joint', 'thumb-second-joint', 'thumb-third-joint')]
+    + [
+        f'left-{d}-{p}'
+        for d in ('index', 'middle', 'ring', 'pinky')
+        for p in ('tip', 'first-joint', 'second-joint', 'third-joint')
+    ]
+    + [
+        'left-wrist',
+        'left-olecranon',
+        'right-olecranon',
+        'left-cubital-fossa',
+        'right-cubital-fossa',
+        'left-acromion',
+        'right-acromion',
+        'neck',
+    ]
+)
 assert len(MHR70) == 70
 
 SIDES = {'L': 'left', 'R': 'right'}
-FINGERS = [f'{d}-{p}' for d in ('index', 'middle', 'ring', 'pinky') for p in ('first-joint', 'second-joint', 'third-joint')]
-REQUIRED = ['nose', 'left-ear', 'right-ear', 'neck'] + [f'{s}-{p}' for s in ('left', 'right') for p in
-            ('shoulder', 'elbow', 'wrist', 'hip', 'knee', 'ankle', 'big-toe-tip', 'small-toe-tip')] + \
-           [f'{s}-{f}' for s in ('left', 'right') for f in FINGERS]
-LEG_POINTS = [f'{s}-{p}' for s in ('left', 'right') for p in ('knee', 'ankle', 'heel', 'big-toe-tip', 'small-toe-tip')]
+FINGERS = [
+    f'{d}-{p}'
+    for d in ('index', 'middle', 'ring', 'pinky')
+    for p in ('first-joint', 'second-joint', 'third-joint')
+]
+REQUIRED = (
+    ['nose', 'left-ear', 'right-ear', 'neck']
+    + [
+        f'{s}-{p}'
+        for s in ('left', 'right')
+        for p in ('shoulder', 'elbow', 'wrist', 'hip', 'knee', 'ankle', 'big-toe-tip', 'small-toe-tip')
+    ]
+    + [f'{s}-{f}' for s in ('left', 'right') for f in FINGERS]
+)
+LEG_POINTS = [
+    f'{s}-{p}' for s in ('left', 'right') for p in ('knee', 'ankle', 'heel', 'big-toe-tip', 'small-toe-tip')
+]
 
 # Animated bones, parents before children: (bone, aim from, aim to | vector, roll reference).
 # Names with a side placeholder {s} expand to L/R; points with {p} expand to left/right.
-BONES = [('pelvis', 'mid_hip', 'neck', 'hip_line'),
-         ('spine', 'mid_hip', 'neck', 'torso_line'),
-         ('chest', 'mid_hip', 'neck', 'shoulder_line'),
-         ('neck', 'neck', 'mid_ear', 'ear_line'),
-         ('head', None, 'head_up', 'ear_line')]
+BONES = [
+    ('pelvis', 'mid_hip', 'neck', 'hip_line'),
+    ('spine', 'mid_hip', 'neck', 'torso_line'),
+    ('chest', 'mid_hip', 'neck', 'shoulder_line'),
+    ('neck', 'neck', 'mid_ear', 'ear_line'),
+    ('head', None, 'head_up', 'ear_line'),
+]
 for _s in 'LR':
     _p = SIDES[_s]
-    BONES += [(f'shoulder.{_s}', 'neck', f'{_p}-shoulder', 'torso_forward'),
-              (f'upper_arm.{_s}', f'{_p}-shoulder', f'{_p}-elbow', f'{_p}_elbow_hinge'),
-              (f'forearm.{_s}', f'{_p}-elbow', f'{_p}-wrist', f'{_p}_elbow_hinge'),
-              (f'hand.{_s}', f'{_p}-wrist', f'{_p}_hand', f'{_p}_elbow_hinge')]
+    BONES += [
+        (f'shoulder.{_s}', 'neck', f'{_p}-shoulder', 'torso_forward'),
+        (f'upper_arm.{_s}', f'{_p}-shoulder', f'{_p}-elbow', f'{_p}_elbow_hinge'),
+        (f'forearm.{_s}', f'{_p}-elbow', f'{_p}-wrist', f'{_p}_elbow_hinge'),
+        (f'hand.{_s}', f'{_p}-wrist', f'{_p}_hand', f'{_p}_elbow_hinge'),
+    ]
 for _s in 'LR':
     _p = SIDES[_s]
-    BONES += [(f'thigh.{_s}', f'{_p}-hip', f'{_p}-knee', f'{_p}_knee_hinge'),
-              (f'shin.{_s}', f'{_p}-knee', f'{_p}-ankle', f'{_p}_knee_hinge'),
-              (f'foot.{_s}', f'{_p}-ankle', f'{_p}_toe', f'{_p}_knee_hinge')]
+    BONES += [
+        (f'thigh.{_s}', f'{_p}-hip', f'{_p}-knee', f'{_p}_knee_hinge'),
+        (f'shin.{_s}', f'{_p}-knee', f'{_p}-ankle', f'{_p}_knee_hinge'),
+        (f'foot.{_s}', f'{_p}-ankle', f'{_p}_toe', f'{_p}_knee_hinge'),
+    ]
 BODY_BONES = [b[0] for b in BONES]
 HINGES = {f'{p}_elbow_hinge': (f'{p}-shoulder', f'{p}-elbow', f'{p}-wrist') for p in SIDES.values()}
 HINGES.update({f'{p}_knee_hinge': (f'{p}-hip', f'{p}-knee', f'{p}-ankle') for p in SIDES.values()})
-SMOOTH_SIGMA_S = .08  # comparable to the arm path's 90 ms window at SAM's ~13-15 Hz
+SMOOTH_SIGMA_S = 0.08  # comparable to the arm path's 90 ms window at SAM's ~13-15 Hz
 
 
 def body_track(capture):
@@ -75,7 +131,12 @@ def body_track(capture):
     names = capture.get('body_keypoints')
     if names is None:
         return None
-    if not isinstance(names, list) or not 1 <= len(names) <= 256 or not all(isinstance(n, str) for n in names) or len(set(names)) != len(names):
+    if (
+        not isinstance(names, list)
+        or not 1 <= len(names) <= 256
+        or not all(isinstance(n, str) for n in names)
+        or len(set(names)) != len(names)
+    ):
         raise ValueError('body_keypoints must be a list of unique names')
     missing = [n for n in REQUIRED if n not in names]
     if missing:
@@ -101,7 +162,7 @@ def smooth(times, points, sigma=SMOOTH_SIGMA_S):
     """Gaussian time smoothing of every keypoint (nonuniform sample times allowed)."""
     out = np.empty_like(points)
     for i, t in enumerate(times):
-        w = np.exp(-.5 * ((times - t) / sigma) ** 2)
+        w = np.exp(-0.5 * ((times - t) / sigma) ** 2)
         w[np.abs(times - t) > 3 * sigma] = 0
         out[i] = np.tensordot(w / w.sum(), points, axes=1)
     return out
@@ -109,11 +170,19 @@ def smooth(times, points, sigma=SMOOTH_SIGMA_S):
 
 def derive(p):
     """Add the derived points and vectors BONES refer to (in place); returns p."""
+
     def mid(a, b):
         return (p[a] + p[b]) / 2
+
     for side in SIDES.values():
-        p.setdefault(f'{side}_hand', np.mean([p[f'{side}-{f}'] for f in FINGERS], axis=0) if f'{side}-{FINGERS[0]}' in p else None)
-        p.setdefault(f'{side}_toe', mid(f'{side}-big-toe-tip', f'{side}-small-toe-tip') if f'{side}-big-toe-tip' in p else None)
+        p.setdefault(
+            f'{side}_hand',
+            np.mean([p[f'{side}-{f}'] for f in FINGERS], axis=0) if f'{side}-{FINGERS[0]}' in p else None,
+        )
+        p.setdefault(
+            f'{side}_toe',
+            mid(f'{side}-big-toe-tip', f'{side}-small-toe-tip') if f'{side}-big-toe-tip' in p else None,
+        )
     p['mid_hip'] = mid('left-hip', 'right-hip')
     p.setdefault('mid_ear', mid('left-ear', 'right-ear'))
     p['hip_line'] = p['left-hip'] - p['right-hip']
@@ -133,7 +202,7 @@ def axes(aim, ref, fallback):
     if np.linalg.norm(z) < 1e-4 * max(np.linalg.norm(ref), 1e-9):
         z = fallback - np.dot(fallback, y) * y
         if np.linalg.norm(z) < 1e-9:
-            z = np.cross(y, [1, 0, 0] if abs(y[0]) < .9 else [0, 0, 1])
+            z = np.cross(y, [1, 0, 0] if abs(y[0]) < 0.9 else [0, 0, 1])
     z = z / np.linalg.norm(z)
     return np.column_stack([np.cross(y, z), y, z])
 
@@ -158,15 +227,20 @@ def rest_points(rig):
 
     p = {}
     for s, side in SIDES.items():
-        p[f'{side}-hip'] = pos(f'thigh.{s}'); p[f'{side}-knee'] = pos(f'shin.{s}'); p[f'{side}-ankle'] = pos(f'foot.{s}')
-        p[f'{side}_toe'] = along(f'toe.{s}', .1)
-        p[f'{side}-shoulder'] = pos(f'upper_arm.{s}'); p[f'{side}-elbow'] = pos(f'forearm.{s}'); p[f'{side}-wrist'] = pos(f'hand.{s}')
-        p[f'{side}_hand'] = along(f'hand.{s}', .08)
+        p[f'{side}-hip'] = pos(f'thigh.{s}')
+        p[f'{side}-knee'] = pos(f'shin.{s}')
+        p[f'{side}-ankle'] = pos(f'foot.{s}')
+        p[f'{side}_toe'] = along(f'toe.{s}', 0.1)
+        p[f'{side}-shoulder'] = pos(f'upper_arm.{s}')
+        p[f'{side}-elbow'] = pos(f'forearm.{s}')
+        p[f'{side}-wrist'] = pos(f'hand.{s}')
+        p[f'{side}_hand'] = along(f'hand.{s}', 0.08)
     p['neck'] = pos('neck')
     # Contract: rest head is upright, facing +Z with the character's left on +X.
-    p['mid_ear'] = along('head', .2)
-    p['left-ear'] = p['mid_ear'] + [.15, 0, 0]; p['right-ear'] = p['mid_ear'] - [.15, 0, 0]
-    p['nose'] = p['mid_ear'] + [0, 0, .15]
+    p['mid_ear'] = along('head', 0.2)
+    p['left-ear'] = p['mid_ear'] + [0.15, 0, 0]
+    p['right-ear'] = p['mid_ear'] - [0.15, 0, 0]
+    p['nose'] = p['mid_ear'] + [0, 0, 0.15]
     return derive(p)
 
 
@@ -174,7 +248,10 @@ def hinge_series(points, name, rest):
     """Per-frame limb bend normal, continuous through straight-limb frames."""
     a, b, c = HINGES[name]
     raw = [np.cross(p[b] - p[a], p[c] - p[b]) for p in points]
-    sizes = [np.linalg.norm(v) / max(np.linalg.norm(p[b] - p[a]) * np.linalg.norm(p[c] - p[b]), 1e-12) for v, p in zip(raw, points)]
+    sizes = [
+        np.linalg.norm(v) / max(np.linalg.norm(p[b] - p[a]) * np.linalg.norm(p[c] - p[b]), 1e-12)
+        for v, p in zip(raw, points)
+    ]
     seed = next((i for i, s in enumerate(sizes) if s > np.sin(np.radians(2))), int(np.argmax(sizes)))
     previous = raw[seed] / np.linalg.norm(raw[seed]) if sizes[seed] > 1e-9 else rest
     out = []
@@ -196,7 +273,9 @@ def check_rig(rig):
 
 
 def leg_length(p, side):
-    return np.linalg.norm(p[f'{side}-knee'] - p[f'{side}-hip']) + np.linalg.norm(p[f'{side}-ankle'] - p[f'{side}-knee'])
+    return np.linalg.norm(p[f'{side}-knee'] - p[f'{side}-hip']) + np.linalg.norm(
+        p[f'{side}-ankle'] - p[f'{side}-knee']
+    )
 
 
 def retarget_body(result, rig, capture, keys=None, sigma=SMOOTH_SIGMA_S, physics_arm=False):
@@ -251,7 +330,10 @@ def retarget_body(result, rig, capture, keys=None, sigma=SMOOTH_SIGMA_S, physics
     def standing(p, leg):
         heels = [np.linalg.norm(p[f'{s}-ankle'] - p[f'{s}-heel']) for s in SIDES.values() if f'{s}-heel' in p]
         return leg * (1.08 if not heels else 1) + (np.mean(heels) if heels else 0)
-    human_hip = np.median([standing(p, (leg_length(p, 'left') + leg_length(p, 'right')) / 2) for p in sampled])
+
+    human_hip = np.median(
+        [standing(p, (leg_length(p, 'left') + leg_length(p, 'right')) / 2) for p in sampled]
+    )
     pelvis_rest = rig.local(node['pelvis'])[0]
     scale = float(pelvis_rest[1]) / human_hip  # contract: floor at the root, y = 0
 
@@ -276,13 +358,29 @@ def retarget_body(result, rig, capture, keys=None, sigma=SMOOTH_SIGMA_S, physics
             previous_q[name] = local
             rotations.append(local.tolist())
         height = (p['mid_hip'][1] - p['_floor']) * scale
-        out.append({'t': float(frame_['t']), 'rotations_xyzw': rotations,
-                    'translation': [float(pelvis_rest[0]), float(height), float(pelvis_rest[2])]})
-    return {'schema': 'homunculus.retarget.v2', 'mode': 'body', 'character': rig.source, 'side': side,
-            'bones': BODY_BONES, 'nodes': [node[b] for b in BODY_BONES],
-            'translation_bone': 'pelvis', 'translation_node': node['pelvis'],
-            'view': 'front', 'mapping': 'camera frame: person facing the camera faces the character forward (+Z)',
-            'character_to_puppet': np.eye(3).tolist(), 'leg_scale': float(scale),
-            'note': ('Kinematic full-body retarget from SAM keypoints; the captured arm uses the physics result. '
-                     'In place: pelvis height from hips above the lowest leg point. No foot IK or contact cleanup.'),
-            'frames': out}
+        out.append(
+            {
+                't': float(frame_['t']),
+                'rotations_xyzw': rotations,
+                'translation': [float(pelvis_rest[0]), float(height), float(pelvis_rest[2])],
+            }
+        )
+    return {
+        'schema': 'homunculus.retarget.v2',
+        'mode': 'body',
+        'character': rig.source,
+        'side': side,
+        'bones': BODY_BONES,
+        'nodes': [node[b] for b in BODY_BONES],
+        'translation_bone': 'pelvis',
+        'translation_node': node['pelvis'],
+        'view': 'front',
+        'mapping': 'camera frame: person facing the camera faces the character forward (+Z)',
+        'character_to_puppet': np.eye(3).tolist(),
+        'leg_scale': float(scale),
+        'note': (
+            'Kinematic full-body retarget from SAM keypoints; the captured arm uses the physics result. '
+            'In place: pelvis height from hips above the lowest leg point. No foot IK or contact cleanup.'
+        ),
+        'frames': out,
+    }

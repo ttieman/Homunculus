@@ -1,4 +1,5 @@
 """Authoring settings shared by every simulation: duration, reach pose, gains, obstacle."""
+
 from dataclasses import dataclass
 import math
 
@@ -17,10 +18,20 @@ class Edit:
         if not isinstance(values, dict) or set(values) - set(cls.__dataclass_fields__):
             raise ValueError('Unknown authoring fields')
         result = cls(**values)
-        for key, lo, hi in [('duration', 2, 30), ('shoulder_deg', 5, 100),
-                            ('elbow_deg', -100, 30), ('strength', .1, 2), ('damping', .2, 3)]:
+        for key, lo, hi in [
+            ('duration', 2, 30),
+            ('shoulder_deg', 5, 100),
+            ('elbow_deg', -100, 30),
+            ('strength', 0.1, 2),
+            ('damping', 0.2, 3),
+        ]:
             val = getattr(result, key)
-            if isinstance(val, bool) or not isinstance(val, (float, int)) or not math.isfinite(val) or not lo <= val <= hi:
+            if (
+                isinstance(val, bool)
+                or not isinstance(val, (float, int))
+                or not math.isfinite(val)
+                or not lo <= val <= hi
+            ):
                 raise ValueError(f'{key} must be finite and within [{lo}, {hi}]')
         if type(result.obstacle) is not bool:
             raise ValueError('obstacle must be boolean')

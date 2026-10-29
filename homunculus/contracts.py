@@ -1,4 +1,5 @@
 """Shared bounded capture/reference and transport contracts."""
+
 import math
 
 MAX_FRAMES = 901
@@ -24,11 +25,12 @@ class SampleGrid:
     Half-millisecond tolerance accommodates millisecond-rounded decoder clocks.
     Late frames skip missed grid instants rather than accumulating drift.
     """
+
     def __init__(self, start, hz):
         self.start, self.hz, self.index = start, hz, 0
 
     def take(self, t):
-        if t + .000501 < self.start + self.index / self.hz:
+        if t + 0.000501 < self.start + self.index / self.hz:
             return False
-        self.index = max(self.index + 1, math.floor((t-self.start+.000501)*self.hz)+1)
+        self.index = max(self.index + 1, math.floor((t - self.start + 0.000501) * self.hz) + 1)
         return True

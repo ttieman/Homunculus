@@ -2,6 +2,7 @@
 
 The code lives in homunculus/ (see docs/ARCHITECTURE.md); this file is only the launcher.
 """
+
 from homunculus.editor.server import main
 
 if __name__ == '__main__':

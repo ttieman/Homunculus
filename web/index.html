@@ -1,121 +1,763 @@
 <!doctype html>
 
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Force Puppet · Motion workspace</title>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Homunculus · Motion workspace</title>
 
-<style>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          Inter,
+          Segoe UI,
+          sans-serif;
+        background: #101518;
+        color: #edf3ee;
+        font-size: 14px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+      button {
+        border: 1px solid #3b494b;
+        border-radius: 7px;
+        background: #263134;
+        color: #e9f1ed;
+        padding: 10px 15px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #3b4b4d;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .primary {
+        background: #b8f4b2;
+        color: #142b1a;
+        border: 0;
+        font-weight: 650;
+      }
+      .primary:hover {
+        background: #d0ffc9;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #303b3d;
+        padding: 20px 28px;
+      }
+      h1 {
+        font-size: 20px;
+        letter-spacing: -0.7px;
+        margin: 0;
+      }
+      h1 span {
+        font-weight: 400;
+        color: #8b9e9c;
+        font-size: 13px;
+        margin-left: 18px;
+      }
+      .badge {
+        font-size: 11px;
+        letter-spacing: 1.3px;
+        text-transform: uppercase;
+        color: #b8f4b2;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(480px, 1fr) 330px;
+        min-height: calc(100vh - 72px);
+      }
+      main {
+        padding: 28px;
+        min-width: 0;
+      }
+      aside {
+        background: #171e21;
+        border-left: 1px solid #303b3d;
+        padding: 26px 24px;
+      }
+      h2 {
+        font-size: 25px;
+        letter-spacing: -0.8px;
+        font-weight: 500;
+        margin: 8px 0 10px;
+      }
+      h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 18px;
+      }
+      p {
+        color: #9dadaa;
+        line-height: 1.6;
+      }
+      .eyebrow {
+        font-size: 11px;
+        letter-spacing: 2px;
+        color: #8b9e9c;
+        text-transform: uppercase;
+      }
+      .stage {
+        position: relative;
+        border: 1px solid #344143;
+        background: radial-gradient(ellipse at 40% 40%, #243234, #141c20);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-top: 26px;
+      }
+      canvas {
+        width: 100%;
+        height: 440px;
+        display: block;
+        touch-action: none;
+        cursor: grab;
+      }
+      canvas:active {
+        cursor: grabbing;
+      }
+      .stage-label {
+        position: absolute;
+        left: 0;
+        top: 0;
+        pointer-events: none;
+        color: #c2d1c9;
+        font-size: 11px;
+        letter-spacing: 0.6px;
+        white-space: nowrap;
+      }
+      .stage-top {
+        position: absolute;
+        top: 18px;
+        left: 20px;
+        right: 20px;
+        display: flex;
+        justify-content: space-between;
+        color: #b0c0ba;
+        font-size: 12px;
+        pointer-events: none;
+      }
+      .legend {
+        display: flex;
+        gap: 16px;
+        font-size: 12px;
+        color: #9dacaa;
+        margin: 16px 0;
+      }
+      .dot {
+        display: inline-block;
+        border-radius: 50%;
+        width: 7px;
+        height: 7px;
+        margin-right: 6px;
+        background: #b8f4b2;
+      }
+      .dot.target {
+        background: #829898;
+      }
+      .dot.path {
+        background: transparent;
+        border: 1px dashed #b8f4b2;
+      }
+      .transport {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px 20px;
+        background: #151d20;
+        border-top: 1px solid #344143;
+      }
+      .transport input {
+        flex: 1;
+        min-width: 0;
+        accent-color: #b8f4b2;
+      }
+      .transport output {
+        font-variant-numeric: tabular-nums;
+        font-size: 12px;
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-top: 18px;
+      }
+      .metric {
+        border: 1px solid #303d3f;
+        border-radius: 8px;
+        padding: 16px;
+      }
+      .metric strong {
+        display: block;
+        font-size: 22px;
+        font-weight: 500;
+        margin: 7px 0;
+      }
+      .metric span {
+        color: #92a5a1;
+        font-size: 12px;
+      }
+      section + section {
+        border-top: 1px solid #324043;
+        padding-top: 24px;
+        margin-top: 24px;
+      }
+      label {
+        display: block;
+        color: #b5c3bd;
+        font-size: 12px;
+        margin: 18px 0 8px;
+      }
+      label output {
+        float: right;
+        color: #edf3ee;
+        font-variant-numeric: tabular-nums;
+      }
+      input[type='range'] {
+        width: 100%;
+        accent-color: #b8f4b2;
+      }
+      input[type='checkbox'] {
+        accent-color: #b8f4b2;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-top: 20px;
+      }
+      .row button {
+        flex: 1;
+      }
+      textarea {
+        resize: vertical;
+        width: 100%;
+        min-height: 85px;
+        border: 1px solid #425251;
+        border-radius: 8px;
+        padding: 12px;
+        background: #10191c;
+        color: #e9f1ed;
+        line-height: 1.5;
+      }
+      .note {
+        font-size: 12px;
+        line-height: 1.6;
+        color: #91a5a0;
+      }
+      .status {
+        padding: 12px;
+        border-left: 2px solid #d0b785;
+        background: #222823;
+        color: #ddd2ba;
+        font-size: 12px;
+        line-height: 1.6;
+        margin: 14px 0;
+      }
+      #proposal {
+        white-space: pre-wrap;
+        font-size: 12px;
+        color: #b8f4b2;
+      }
+      footer {
+        margin-top: 22px;
+        display: flex;
+        gap: 10px;
+      }
+      #message {
+        min-height: 20px;
+        font-size: 12px;
+        color: #dac393;
+      }
+      select {
+        background: #1d2a2c;
+        color: #dbe8df;
+        padding: 7px;
+        border: 1px solid #415351;
+        border-radius: 5px;
+      }
+      .subtitle {
+        margin: 0;
+        font-size: 13px;
+      }
+      @media (max-width: 850px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        aside {
+          border-left: 0;
+          border-top: 1px solid #303b3d;
+        }
+        main {
+          padding: 20px;
+        }
+        canvas {
+          height: 350px;
+        }
+        h1 span {
+          display: none;
+        }
+        .metrics {
+          gap: 6px;
+        }
+        .metric {
+          padding: 10px;
+        }
+      }
 
-:root{color-scheme:dark;font-family:Inter,Segoe UI,sans-serif;background:#101518;color:#edf3ee;font-size:14px}*{box-sizing:border-box}body{margin:0}button,input,textarea{font:inherit}button{border:1px solid #3b494b;border-radius:7px;background:#263134;color:#e9f1ed;padding:10px 15px;cursor:pointer}button:hover{background:#3b4b4d}button:disabled{opacity:.4;cursor:default}.primary{background:#b8f4b2;color:#142b1a;border:0;font-weight:650}.primary:hover{background:#d0ffc9}header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #303b3d;padding:20px 28px}h1{font-size:20px;letter-spacing:-.7px;margin:0}h1 span{font-weight:400;color:#8b9e9c;font-size:13px;margin-left:18px}.badge{font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:#b8f4b2}.layout{display:grid;grid-template-columns:minmax(480px,1fr) 330px;min-height:calc(100vh - 72px)}main{padding:28px;min-width:0}aside{background:#171e21;border-left:1px solid #303b3d;padding:26px 24px}h2{font-size:25px;letter-spacing:-.8px;font-weight:500;margin:8px 0 10px}h3{font-size:14px;font-weight:600;margin:0 0 18px}p{color:#9dadaa;line-height:1.6}.eyebrow{font-size:11px;letter-spacing:2px;color:#8b9e9c;text-transform:uppercase}.stage{position:relative;border:1px solid #344143;background:radial-gradient(ellipse at 40% 40%,#243234,#141c20);border-radius:12px;overflow:hidden;margin-top:26px}canvas{width:100%;height:440px;display:block;touch-action:none;cursor:grab}canvas:active{cursor:grabbing}.stage-label{position:absolute;left:0;top:0;pointer-events:none;color:#c2d1c9;font-size:11px;letter-spacing:.6px;white-space:nowrap}.stage-top{position:absolute;top:18px;left:20px;right:20px;display:flex;justify-content:space-between;color:#b0c0ba;font-size:12px;pointer-events:none}.legend{display:flex;gap:16px;font-size:12px;color:#9dacaa;margin:16px 0}.dot{display:inline-block;border-radius:50%;width:7px;height:7px;margin-right:6px;background:#b8f4b2}.dot.target{background:#829898}.dot.path{background:transparent;border:1px dashed #b8f4b2}.transport{display:flex;align-items:center;gap:15px;padding:15px 20px;background:#151d20;border-top:1px solid #344143}.transport input{flex:1;min-width:0;accent-color:#b8f4b2}.transport output{font-variant-numeric:tabular-nums;font-size:12px}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}.metric{border:1px solid #303d3f;border-radius:8px;padding:16px}.metric strong{display:block;font-size:22px;font-weight:500;margin:7px 0}.metric span{color:#92a5a1;font-size:12px}section+section{border-top:1px solid #324043;padding-top:24px;margin-top:24px}label{display:block;color:#b5c3bd;font-size:12px;margin:18px 0 8px}label output{float:right;color:#edf3ee;font-variant-numeric:tabular-nums}input[type=range]{width:100%;accent-color:#b8f4b2}input[type=checkbox]{accent-color:#b8f4b2}.row{display:flex;gap:8px;margin-top:20px}.row button{flex:1}textarea{resize:vertical;width:100%;min-height:85px;border:1px solid #425251;border-radius:8px;padding:12px;background:#10191c;color:#e9f1ed;line-height:1.5}.note{font-size:12px;line-height:1.6;color:#91a5a0}.status{padding:12px;border-left:2px solid #d0b785;background:#222823;color:#ddd2ba;font-size:12px;line-height:1.6;margin:14px 0}#proposal{white-space:pre-wrap;font-size:12px;color:#b8f4b2}footer{margin-top:22px;display:flex;gap:10px}#message{min-height:20px;font-size:12px;color:#dac393}select{background:#1d2a2c;color:#dbe8df;padding:7px;border:1px solid #415351;border-radius:5px}.subtitle{margin:0;font-size:13px}@media(max-width:850px){.layout{grid-template-columns:1fr}aside{border-left:0;border-top:1px solid #303b3d}main{padding:20px}canvas{height:350px}h1 span{display:none}.metrics{gap:6px}.metric{padding:10px}}
+      .compare-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+      }
+      .compare-grid.has-video {
+        grid-template-columns: 1fr 1fr;
+      }
+      .source-pane {
+        min-width: 0;
+        background: #111a1d;
+        border: 1px solid #344143;
+        border-radius: 12px;
+        margin-top: 26px;
+        padding: 12px;
+      }
+      .source-pane video {
+        width: 100%;
+        height: 340px;
+        object-fit: contain;
+      }
+      .source-pane p {
+        font-size: 12px;
+      }
+      .has-video canvas {
+        height: 340px;
+      }
+      .comparison-active .layout {
+        grid-template-columns: 1fr;
+      }
+      .comparison-active aside {
+        border-left: 0;
+      }
+      .comparison-active main {
+        padding: 20px;
+      }
+      .compare-grid > * {
+        min-width: 0;
+      }
+      @media (max-width: 500px) {
+        .source-pane video,
+        .has-video canvas {
+          height: 250px;
+        }
+      }
 
-.compare-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}.compare-grid.has-video{grid-template-columns:1fr 1fr}.source-pane{min-width:0;background:#111a1d;border:1px solid #344143;border-radius:12px;margin-top:26px;padding:12px}.source-pane video{width:100%;height:340px;object-fit:contain}.source-pane p{font-size:12px}.has-video canvas{height:340px}.comparison-active .layout{grid-template-columns:1fr}.comparison-active aside{border-left:0}.comparison-active main{padding:20px}.compare-grid>*{min-width:0}@media(max-width:500px){.source-pane video,.has-video canvas{height:250px}}
+      #chat-log {
+        max-height: 360px;
+        overflow: auto;
+        border: 1px solid #344143;
+        border-radius: 8px;
+        padding: 12px;
+      }
+      .chat-entry {
+        margin-bottom: 16px;
+      }
+      .chat-entry p {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        margin: 5px 0;
+      }
+      .chat-entry strong {
+        color: #b8f4b2;
+      }
+      .attachment {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+        font-size: 12px;
+        margin: 8px 0;
+      }
+      .attachment span {
+        overflow-wrap: anywhere;
+      }
+      .attachment button {
+        padding: 4px 8px;
+      }
+      .scene-position {
+        display: flex;
+        gap: 6px;
+      }
+      .scene-position input {
+        width: 30%;
+      }
+      #chat-panel textarea {
+        min-height: 90px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>◈ Homunculus <span>Motion workspace</span></h1>
+      <span class="badge">Feasibility 01</span>
+    </header>
 
+    <div class="layout">
+      <main>
+        <div class="eyebrow">Performance / Supported reach</div>
+        <h2>Give motion a little resistance.</h2>
+        <p class="subtitle">Shape a reach. Let the body respond. Keep the result.</p>
 
+        <div id="comparison" class="compare-grid">
+          <div id="source-pane" class="source-pane" hidden>
+            <strong>Source recording</strong
+            ><video id="source-video" muted playsinline preload="auto"></video>
+            <p id="sync-status" role="status">Select a matching source video.</p>
+          </div>
+          <div class="stage">
+            <div class="stage-top">
+              <span id="view-label">Physical result · fixed shoulder</span
+              ><span>Drag to orbit · scroll to zoom · right-drag to pan · double-click to reset</span>
+            </div>
+            <canvas
+              id="stage"
+              aria-label="3D view of the animated physical arm with reference target and obstacle"
+            ></canvas>
 
-#chat-log{max-height:360px;overflow:auto;border:1px solid #344143;border-radius:8px;padding:12px}.chat-entry{margin-bottom:16px}.chat-entry p{white-space:pre-wrap;overflow-wrap:anywhere;margin:5px 0}.chat-entry strong{color:#b8f4b2}.attachment{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;margin:8px 0}.attachment span{overflow-wrap:anywhere}.attachment button{padding:4px 8px}.scene-position{display:flex;gap:6px}.scene-position input{width:30%}#chat-panel textarea{min-height:90px}
+            <div class="transport">
+              <button id="play" aria-label="Pause playback">Pause</button
+              ><input
+                id="timeline"
+                aria-label="Animation time"
+                type="range"
+                min="0"
+                max="1"
+                step=".001"
+                value="0"
+              /><output id="time">0.00 / 4.00 s</output>
+            </div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i class="dot"></i>Physical arm</span
+          ><span><i class="dot target"></i>Intended motion (ghost)</span
+          ><span><i class="dot path"></i>Hand path</span><span>▧ Fixed support</span
+          ><span id="physics-toggle" hidden
+            ><input id="show-physics" type="checkbox" />
+            <label for="show-physics" style="display: inline; margin: 0">Show physics arm</label>
+            <input id="physics-arm" type="checkbox" />
+            <label for="physics-arm" style="display: inline; margin: 0">Drive arm from physics</label></span
+          ><span id="view-toggle" hidden
+            ><label for="character-view" style="display: inline; margin: 0">Recording view</label>
+            <select id="character-view">
+              <option value="auto">Auto</option>
+              <option value="front">Facing camera</option>
+              <option value="side">Side-on</option>
+            </select></span
+          >
+        </div>
 
-</style></head><body>
+        <div class="metrics">
+          <div class="metric">
+            <span>Tracking error</span><strong id="error">—</strong><span>RMS across joint axes</span>
+          </div>
+          <div class="metric">
+            <span>Contact</span><strong id="contact">—</strong><span>Physics steps touching</span>
+          </div>
+          <div class="metric">
+            <span>Simulation time</span><strong id="speed">—</strong><span>For the complete clip</span>
+          </div>
+        </div>
 
-<header><h1>◈ Force Puppet <span>Motion workspace</span></h1><span class="badge">Feasibility 01</span></header>
+        <footer>
+          <button id="export">Export glTF</button
+          ><button id="export-character" hidden disabled>Export character GLB</button
+          ><button id="replay">Replay export</button><button id="save">Save session</button>
+        </footer>
 
-<div class="layout"><main>
+        <p id="message" role="status">Preparing the supported reach…</p>
 
-<div class="eyebrow">Performance / Supported reach</div><h2>Give motion a little resistance.</h2><p class="subtitle">Shape a reach. Let the body respond. Keep the result.</p>
+        <p class="note" id="character-note"></p>
+        <p class="note" id="source-note">
+          Original procedural reference · MuJoCo torque control · Shoulder anchored to the world.<br />Full-body
+          balance and game retargeting are not included.
+        </p>
+      </main>
+      <aside>
+        <section>
+          <div class="eyebrow">00 / Reference</div>
+          <h3 style="margin-top: 12px">Bring a performance</h3>
 
-<div id="comparison" class="compare-grid"><div id="source-pane" class="source-pane" hidden><strong>Source recording</strong><video id="source-video" muted playsinline preload="auto"></video><p id="sync-status" role="status">Select a matching source video.</p></div><div class="stage"><div class="stage-top"><span id="view-label">Physical result · fixed shoulder</span><span>Drag to orbit · scroll to zoom · right-drag to pan · double-click to reset</span></div><canvas id="stage" aria-label="3D view of the animated physical arm with reference target and obstacle"></canvas>
+          <label for="process-file">Process a video with SAM 3D Body</label
+          ><input id="process-file" type="file" accept="video/*,.mp4,.webm,.mov,.mkv,.avi,.mpg" />
 
-<div class="transport"><button id="play" aria-label="Pause playback">Pause</button><input id="timeline" aria-label="Animation time" type="range" min="0" max="1" step=".001" value="0"><output id="time">0.00 / 4.00 s</output></div></div>
+          <label for="process-start">Start at (s)</label
+          ><input id="process-start" type="number" min="0" step="0.1" value="0" />
 
-</div><div class="legend"><span><i class="dot"></i>Physical arm</span><span><i class="dot target"></i>Intended motion (ghost)</span><span><i class="dot path"></i>Hand path</span><span>▧ Fixed support</span><span id="physics-toggle" hidden><input id="show-physics" type="checkbox"> <label for="show-physics" style="display:inline;margin:0">Show physics arm</label> <input id="physics-arm" type="checkbox"> <label for="physics-arm" style="display:inline;margin:0">Drive arm from physics</label></span><span id="view-toggle" hidden><label for="character-view" style="display:inline;margin:0">Recording view</label> <select id="character-view"><option value="auto">Auto</option><option value="front">Facing camera</option><option value="side">Side-on</option></select></span></div>
+          <p id="job-status" class="note" role="status">
+            Choose a clip (up to 30 s from Start at; .mkv and other formats are converted to mp4). The GPU
+            worker finds the person, reconstructs the body, and the whole skeleton is retargeted
+            automatically.
+          </p>
 
-<div class="metrics"><div class="metric"><span>Tracking error</span><strong id="error">—</strong><span>RMS across joint axes</span></div><div class="metric"><span>Contact</span><strong id="contact">—</strong><span>Physics steps touching</span></div><div class="metric"><span>Simulation time</span><strong id="speed">—</strong><span>For the complete clip</span></div></div>
+          <label for="video-file">Preview your video locally</label
+          ><input id="video-file" type="file" accept="video/*" />
 
-<footer><button id="export">Export glTF</button><button id="export-character" hidden disabled>Export character GLB</button><button id="replay">Replay export</button><button id="save">Save session</button></footer>
+          <label for="capture-file">Import worker capture.json</label
+          ><input id="capture-file" type="file" accept="application/json,.json" />
 
-<p id="message" role="status">Preparing the supported reach…</p>
+          <p id="capture-status" class="note" role="status">
+            Video stays in your browser. Process it on the SAM worker above, or import a capture.json made
+            with worker/capture_video.py. SAM weights are not bundled.
+          </p>
 
-<p class="note" id="character-note"></p><p class="note" id="source-note">Original procedural reference · MuJoCo torque control · Shoulder anchored to the world.<br>Full-body balance and game retargeting are not included.</p>
+          <label
+            ><input id="review-capture" type="checkbox" /> I checked the overlay, person and axis
+            mapping</label
+          >
 
+          <button id="use-capture" disabled>Use captured motion</button>
+          <button id="use-fixture">Use demo reach</button>
+        </section>
+        <section>
+          <div class="eyebrow">01 / Refine</div>
+          <h3 style="margin-top: 12px">Performance controls</h3>
 
+          <label for="duration">Duration <output id="duration-value"></output></label
+          ><input id="duration" type="range" min="2" max="30" step=".01" value="4" />
 
-</main><aside><section><div class="eyebrow">00 / Reference</div><h3 style="margin-top:12px">Bring a performance</h3>
+          <label for="shoulder_deg">Shoulder reach <output id="shoulder_deg-value"></output></label
+          ><input id="shoulder_deg" type="range" min="5" max="100" step="1" value="65" />
 
-<label for="process-file">Process a video with SAM 3D Body</label><input id="process-file" type="file" accept="video/*,.mp4,.webm,.mov,.mkv,.avi,.mpg">
+          <label for="elbow_deg">Elbow bend <output id="elbow_deg-value"></output></label
+          ><input id="elbow_deg" type="range" min="-100" max="30" step="1" value="-35" />
 
-<label for="process-start">Start at (s)</label><input id="process-start" type="number" min="0" step="0.1" value="0">
+          <label for="strength">Muscle strength <output id="strength-value"></output></label
+          ><input id="strength" type="range" min=".1" max="2" step=".1" value="1" />
 
-<p id="job-status" class="note" role="status">Choose a clip (up to 30 s from Start at; .mkv and other formats are converted to mp4). The GPU worker finds the person, reconstructs the body, and the whole skeleton is retargeted automatically.</p>
+          <label for="damping">Damping <output id="damping-value"></output></label
+          ><input id="damping" type="range" min=".2" max="3" step=".1" value="1" />
 
-<label for="video-file">Preview your video locally</label><input id="video-file" type="file" accept="video/*">
+          <label><input id="obstacle" type="checkbox" checked /> Place an obstacle in the reach</label>
 
-<label for="capture-file">Import worker capture.json</label><input id="capture-file" type="file" accept="application/json,.json">
+          <div class="row">
+            <button id="apply" class="primary">Simulate edit</button><button id="undo" disabled>Undo</button
+            ><button id="redo" disabled>Redo</button>
+          </div>
+          <p><button id="optimize" disabled>Optimize captured motion</button></p>
 
-<p id="capture-status" class="note" role="status">Video stays in your browser. Process it on the SAM worker above, or import a capture.json made with worker/capture_video.py. SAM weights are not bundled.</p>
+          <div>
+            <button id="three-poses" disabled>Assemble three poses</button>
+            <button id="save-reference" disabled>Save reference</button>
+          </div>
 
-<label><input id="review-capture" type="checkbox"> I checked the overlay, person and axis mapping</label>
+          <label for="key-index">Keyframe number (starting at 1)</label
+          ><input id="key-index" type="number" min="1" value="2" />
 
-<button id="use-capture" disabled>Use captured motion</button> <button id="use-fixture">Use demo reach</button>
+          <label for="key-time">New keyframe time (seconds)</label
+          ><input id="key-time" type="number" min="0" max="30" step=".05" value="7" />
 
-</section><section><div class="eyebrow">01 / Refine</div><h3 style="margin-top:12px">Performance controls</h3>
+          <label for="key-curve">Timing curve</label
+          ><select id="key-curve">
+            <option value="linear">Linear / SLERP</option>
+            <option value="smoothstep">Ease in/out / SLERP</option>
+            <option value="hold">Hold</option>
+          </select>
 
-<label for="duration">Duration <output id="duration-value"></output></label><input id="duration" type="range" min="2" max="30" step=".01" value="4">
+          <p><button id="edit-key" disabled>Apply keyframe edit</button></p>
 
-<label for="shoulder_deg">Shoulder reach <output id="shoulder_deg-value"></output></label><input id="shoulder_deg" type="range" min="5" max="100" step="1" value="65">
+          <p class="note">
+            Save reference preserves poses and timing. Reload with Import worker capture.json. Physics keeps
+            the shoulder fixed.
+          </p>
+        </section>
 
-<label for="elbow_deg">Elbow bend <output id="elbow_deg-value"></output></label><input id="elbow_deg" type="range" min="-100" max="30" step="1" value="-35">
+        <section hidden>
+          <div class="eyebrow">02 / Direct</div>
+          <h3 style="margin-top: 12px">Describe the change</h3>
+          <textarea
+            id="prompt"
+            aria-label="Direction for Muse Spark"
+            placeholder="Make the reach slower and loosen the arm."
+          ></textarea>
 
-<label for="strength">Muscle strength <output id="strength-value"></output></label><input id="strength" type="range" min=".1" max="2" step=".1" value="1">
+          <div id="meta-status" class="status">Checking Muse Spark access…</div>
+          <button id="propose">Ask Muse Spark</button>
+          <pre id="proposal"></pre>
+          <button id="accept" hidden class="primary">Apply proposed edit</button>
+          <p class="note">
+            Direction is sent to Meta only when you ask. Review the proposed controls before applying. Manual
+            edits and language edits share the same controls and undo history.
+          </p>
+        </section>
 
-<label for="damping">Damping <output id="damping-value"></output></label><input id="damping" type="range" min=".2" max="3" step=".1" value="1">
+        <section>
+          <h3>Pose correction</h3>
+          <p class="note">
+            Uses the keyframe number above. Edits joint-local rotation; original observations are preserved.
+          </p>
 
-<label><input id="obstacle" type="checkbox" checked> Place an obstacle in the reach</label>
+          <label for="pose-joint">Joint</label
+          ><select id="pose-joint">
+            <option value="shoulder">Shoulder</option>
+            <option value="elbow">Elbow (Z hinge)</option>
+          </select>
 
-<div class="row"><button id="apply" class="primary">Simulate edit</button><button id="undo" disabled>Undo</button><button id="redo" disabled>Redo</button></div><p><button id="optimize" disabled>Optimize captured motion</button></p>
+          <label for="pose-axis">Local axis</label
+          ><select id="pose-axis">
+            <option>x</option>
+            <option>y</option>
+            <option selected>z</option>
+          </select>
 
-<div><button id="three-poses" disabled>Assemble three poses</button> <button id="save-reference" disabled>Save reference</button></div>
+          <label for="pose-angle">Rotation change (degrees)</label
+          ><input id="pose-angle" type="number" min="-45" max="45" value="5" /><button id="adjust-pose">
+            Adjust pose
+          </button>
+        </section>
 
-<label for="key-index">Keyframe number (starting at 1)</label><input id="key-index" type="number" min="1" value="2">
+        <section>
+          <h3>Segment physics</h3>
+          <p class="note">
+            Override strength and/or damping for a range of the clip, in source seconds (the "Matched source"
+            time). Physics shows on the character with Drive arm from physics ticked.
+          </p>
+          <label for="segment-id">Segment id (blank = next)</label
+          ><input id="segment-id" type="text" maxlength="40" placeholder="seg-1" />
+          <div class="row">
+            <label for="segment-start">Start (s)</label
+            ><input id="segment-start" type="number" min="0" step="0.1" value="0" /><label for="segment-end"
+              >End (s)</label
+            ><input id="segment-end" type="number" min="0" step="0.1" value="1" />
+          </div>
+          <div class="row">
+            <label for="segment-strength">Strength</label
+            ><input id="segment-strength" type="number" min="0.1" max="2" step="0.1" placeholder="—" /><label
+              for="segment-damping"
+              >Damping</label
+            ><input id="segment-damping" type="number" min="0.2" max="3" step="0.1" placeholder="—" />
+          </div>
+          <div class="row">
+            <label for="segment-blend">Blend (s)</label
+            ><input id="segment-blend" type="number" min="0" step="0.05" value="0.2" /><label
+              for="segment-curve"
+              >Curve</label
+            ><select id="segment-curve">
+              <option>smoothstep</option>
+              <option>linear</option>
+              <option>smootherstep</option>
+              <option>ease_in</option>
+              <option>ease_out</option>
+              <option>ease_in_out</option>
+              <option>expo_in</option>
+              <option>expo_out</option>
+              <option>step</option>
+            </select>
+          </div>
+          <p>
+            <button id="segment-apply">Apply segment</button>
+            <button id="segment-clear">Clear segments</button>
+          </p>
+          <pre id="segment-list" class="note">No segments.</pre>
+        </section>
 
-<label for="key-time">New keyframe time (seconds)</label><input id="key-time" type="number" min="0" max="30" step=".05" value="7">
+        <section>
+          <h3>Scene setup</h3>
+          <label for="scene-background">Background</label
+          ><input id="scene-background" type="color" value="#142024" />
 
-<label for="key-curve">Timing curve</label><select id="key-curve"><option value="linear">Linear / SLERP</option><option value="smoothstep">Ease in/out / SLERP</option><option value="hold">Hold</option></select>
+          <label><input id="scene-grid" type="checkbox" checked /> Show grid</label
+          ><label for="scene-light">Key light intensity</label
+          ><input id="scene-light" type="range" min="0" max="5" step=".1" value="2.1" />
 
-<p><button id="edit-key" disabled>Apply keyframe edit</button></p>
+          <label for="scene-camera">Camera</label
+          ><select id="scene-camera">
+            <option>home</option>
+            <option>front</option>
+            <option>side</option>
+            <option>top</option>
+          </select>
+          <p><button id="apply-scene">Apply scene</button> <button id="save-scene">Save scene</button></p>
 
-<p class="note">Save reference preserves poses and timing. Reload with Import worker capture.json. Physics keeps the shoulder fixed.</p></section>
+          <label for="prop-shape">Decorative prop</label
+          ><select id="prop-shape">
+            <option>box</option>
+            <option>sphere</option></select
+          ><label>Position X / Y / Z (metres)</label>
+          <div class="scene-position">
+            <input id="prop-x" aria-label="Prop X" type="number" value=".7" step=".1" /><input
+              id="prop-y"
+              aria-label="Prop Y"
+              type="number"
+              value=".15"
+              step=".1"
+            /><input id="prop-z" aria-label="Prop Z" type="number" value="0" step=".1" />
+          </div>
+          <p><button id="add-prop">Add prop</button> <button id="clear-props">Clear props</button></p>
+          <p class="note">
+            Props are visual only. The reach obstacle control enables simulated collision. Attach a saved
+            scene in chat to reload it.
+          </p>
+        </section>
 
-<section hidden><div class="eyebrow">02 / Direct</div><h3 style="margin-top:12px">Describe the change</h3><textarea id="prompt" aria-label="Direction for Muse Spark" placeholder="Make the reach slower and loosen the arm."></textarea>
+        <section id="chat-panel">
+          <div class="eyebrow">Muse / Workspace operator</div>
+          <h3 style="margin-top: 12px">Direct the workspace</h3>
+          <p id="chat-status" class="note" role="status">Checking Muse access...</p>
+          <div id="chat-log" role="log" aria-label="Muse conversation"></div>
+          <div id="chat-attachments"></div>
 
-<div id="meta-status" class="status">Checking Muse Spark access…</div><button id="propose">Ask Muse Spark</button><pre id="proposal"></pre><button id="accept" hidden class="primary">Apply proposed edit</button><p class="note">Direction is sent to Meta only when you ask. Review the proposed controls before applying. Manual edits and language edits share the same controls and undo history.</p></section>
+          <label for="chat-files">Attach images, video, capture or scene JSON</label
+          ><input
+            id="chat-files"
+            type="file"
+            multiple
+            accept="image/png,image/jpeg,image/webp,image/gif,video/*,.mkv,.json"
+          />
 
-<section><h3>Pose correction</h3><p class="note">Uses the keyframe number above. Edits joint-local rotation; original observations are preserved.</p>
+          <p class="note">
+            Drop files here or paste an image. Attached images and your message are sent to Meta when you
+            press Send. Videos stay local; they need SAM processing before they can drive motion.
+          </p>
 
-<label for="pose-joint">Joint</label><select id="pose-joint"><option value="shoulder">Shoulder</option><option value="elbow">Elbow (Z hinge)</option></select>
+          <textarea
+            id="chat-prompt"
+            aria-label="Message Muse"
+            placeholder="Make the reach slower, switch to the front camera and add a blue box beside the character."
+          ></textarea>
 
-<label for="pose-axis">Local axis</label><select id="pose-axis"><option>x</option><option>y</option><option selected>z</option></select>
-
-<label for="pose-angle">Rotation change (degrees)</label><input id="pose-angle" type="number" min="-45" max="45" value="5"><button id="adjust-pose">Adjust pose</button></section>
-
-<section><h3>Segment physics</h3><p class="note">Override strength and/or damping for a range of the clip, in source seconds (the "Matched source" time). Physics shows on the character with Drive arm from physics ticked.</p>
-<label for="segment-id">Segment id (blank = next)</label><input id="segment-id" type="text" maxlength="40" placeholder="seg-1">
-<div class="row"><label for="segment-start">Start (s)</label><input id="segment-start" type="number" min="0" step="0.1" value="0"><label for="segment-end">End (s)</label><input id="segment-end" type="number" min="0" step="0.1" value="1"></div>
-<div class="row"><label for="segment-strength">Strength</label><input id="segment-strength" type="number" min="0.1" max="2" step="0.1" placeholder="—"><label for="segment-damping">Damping</label><input id="segment-damping" type="number" min="0.2" max="3" step="0.1" placeholder="—"></div>
-<div class="row"><label for="segment-blend">Blend (s)</label><input id="segment-blend" type="number" min="0" step="0.05" value="0.2"><label for="segment-curve">Curve</label><select id="segment-curve"><option>smoothstep</option><option>linear</option><option>smootherstep</option><option>ease_in</option><option>ease_out</option><option>ease_in_out</option><option>expo_in</option><option>expo_out</option><option>step</option></select></div>
-<p><button id="segment-apply">Apply segment</button> <button id="segment-clear">Clear segments</button></p>
-<pre id="segment-list" class="note">No segments.</pre></section>
-
-<section><h3>Scene setup</h3><label for="scene-background">Background</label><input id="scene-background" type="color" value="#142024">
-
-<label><input id="scene-grid" type="checkbox" checked> Show grid</label><label for="scene-light">Key light intensity</label><input id="scene-light" type="range" min="0" max="5" step=".1" value="2.1">
-
-<label for="scene-camera">Camera</label><select id="scene-camera"><option>home</option><option>front</option><option>side</option><option>top</option></select><p><button id="apply-scene">Apply scene</button> <button id="save-scene">Save scene</button></p>
-
-<label for="prop-shape">Decorative prop</label><select id="prop-shape"><option>box</option><option>sphere</option></select><label>Position X / Y / Z (metres)</label><div class="scene-position"><input id="prop-x" aria-label="Prop X" type="number" value=".7" step=".1"><input id="prop-y" aria-label="Prop Y" type="number" value=".15" step=".1"><input id="prop-z" aria-label="Prop Z" type="number" value="0" step=".1"></div><p><button id="add-prop">Add prop</button> <button id="clear-props">Clear props</button></p><p class="note">Props are visual only. The reach obstacle control enables simulated collision. Attach a saved scene in chat to reload it.</p></section>
-
-<section id="chat-panel"><div class="eyebrow">Muse / Workspace operator</div><h3 style="margin-top:12px">Direct the workspace</h3><p id="chat-status" class="note" role="status">Checking Muse access...</p><div id="chat-log" role="log" aria-label="Muse conversation"></div><div id="chat-attachments"></div>
-
-<label for="chat-files">Attach images, video, capture or scene JSON</label><input id="chat-files" type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,video/*,.mkv,.json">
-
-<p class="note">Drop files here or paste an image. Attached images and your message are sent to Meta when you press Send. Videos stay local; they need SAM processing before they can drive motion.</p>
-
-<textarea id="chat-prompt" aria-label="Message Muse" placeholder="Make the reach slower, switch to the front camera and add a blue box beside the character."></textarea>
-
-<div class="row"><button id="chat-send" class="primary">Send to Muse</button><button id="chat-stop" disabled>Stop</button><button id="chat-clear">New chat</button></div><p class="note">Muse uses the same validated actions as the controls. Tool results appear above. Undo reverses motion and scene changes.</p></section><section><details><summary>Command inspector - same tools as Muse</summary><label for="command-name">Command</label><select id="command-name"></select><label for="command-arguments">JSON arguments</label><textarea id="command-arguments">{}</textarea><button id="run-command">Run command</button><pre id="command-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details></section></aside></div><script type="module" src="/app.js"></script></body></html>
+          <div class="row">
+            <button id="chat-send" class="primary">Send to Muse</button
+            ><button id="chat-stop" disabled>Stop</button><button id="chat-clear">New chat</button>
+          </div>
+          <p class="note">
+            Muse uses the same validated actions as the controls. Tool results appear above. Undo reverses
+            motion and scene changes.
+          </p>
+        </section>
+        <section>
+          <details>
+            <summary>Command inspector - same tools as Muse</summary>
+            <label for="command-name">Command</label
+            ><select id="command-name"></select
+            ><label for="command-arguments">JSON arguments</label
+            ><textarea id="command-arguments">{}</textarea><button id="run-command">Run command</button>
+            <pre id="command-result" style="white-space: pre-wrap; overflow-wrap: anywhere"></pre>
+          </details>
+        </section>
+      </aside>
+    </div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

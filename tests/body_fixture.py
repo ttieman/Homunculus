@@ -1,4 +1,5 @@
 """CI-only: a synthetic full-body capture (test rig posed over time) for the browser test."""
+
 import json
 import sys
 from pathlib import Path

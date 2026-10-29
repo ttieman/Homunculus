@@ -2,6 +2,7 @@
 
 Writes nothing unless run as a script (CI writes outputs/test-character.glb for the browser test).
 """
+
 import math
 import struct
 import sys
@@ -15,8 +16,11 @@ from homunculus.retarget.character import mat_q, qinv, qmul, write_glb  # noqa: 
 
 def aim(direction, roll_hint=(0, 0, 1)):
     """World rotation whose +Y points along direction."""
-    y = np.asarray(direction, float); y /= np.linalg.norm(y)
-    z = np.asarray(roll_hint, float); z = z - np.dot(z, y) * y; z /= np.linalg.norm(z)
+    y = np.asarray(direction, float)
+    y /= np.linalg.norm(y)
+    z = np.asarray(roll_hint, float)
+    z = z - np.dot(z, y) * y
+    z /= np.linalg.norm(z)
     return mat_q(np.column_stack([np.cross(y, z), y, z]))
 
 
@@ -32,6 +36,7 @@ def build(drop_bone=None):
         else:
             ph, pr = world[parent]
             from homunculus.retarget.character import qmat
+
             t = qmat(qinv(pr)) @ (np.array(head, float) - ph)
             r = qmul(qinv(pr), rot)
         world[len(nodes)] = (np.array(head, float), rot)
@@ -43,45 +48,62 @@ def build(drop_bone=None):
 
     # Joint layout measured from the Bevy-playground stickman (A-pose, faces +Z, left on +X).
     root = bone('root', None, [0, 0, 0], [0, 1, 0])
-    pelvis = bone('pelvis', root, [0, .9, 0], [0, 1, 0])
+    pelvis = bone('pelvis', root, [0, 0.9, 0], [0, 1, 0])
     spine = bone('spine', pelvis, [0, 1.07, 0], [0, 1, 0])
     chest = bone('chest', spine, [0, 1.25, 0], [0, 1, 0])
     neck = bone('neck', chest, [0, 1.41, 0], [0, 1, 0])
     bone('head', neck, [0, 1.49, 0], [0, 1, 0])
     for side, sx in (('L', 1), ('R', -1)):
-        thigh = bone(f'thigh.{side}', pelvis, [.105*sx, .9, 0], [.036*sx, -.996, .085])
-        shin = bone(f'shin.{side}', thigh, [.12*sx, .49, .035], [.027*sx, -.995, -.094])
-        foot = bone(f'foot.{side}', shin, [.13*sx, .12, 0], [0, -.298, .954], (1, 0, 0))
-        bone(f'toe.{side}', foot, [.13*sx, .07, .16], [0, 0, 1], (1, 0, 0))
+        thigh = bone(f'thigh.{side}', pelvis, [0.105 * sx, 0.9, 0], [0.036 * sx, -0.996, 0.085])
+        shin = bone(f'shin.{side}', thigh, [0.12 * sx, 0.49, 0.035], [0.027 * sx, -0.995, -0.094])
+        foot = bone(f'foot.{side}', shin, [0.13 * sx, 0.12, 0], [0, -0.298, 0.954], (1, 0, 0))
+        bone(f'toe.{side}', foot, [0.13 * sx, 0.07, 0.16], [0, 0, 1], (1, 0, 0))
     for side, sx in (('L', 1), ('R', -1)):
-        sh = bone(f'shoulder.{side}', chest, [.13*sx, 1.34, 0], [sx, -.18, 0])
-        up = bone(f'upper_arm.{side}', sh, [.24*sx, 1.32, 0], [.65*sx, -.75, -.09])
+        sh = bone(f'shoulder.{side}', chest, [0.13 * sx, 1.34, 0], [sx, -0.18, 0])
+        up = bone(f'upper_arm.{side}', sh, [0.24 * sx, 1.32, 0], [0.65 * sx, -0.75, -0.09])
         if up is None:
             continue
-        elbow = np.array([.24*sx, 1.32, 0]) + .29 * np.array([.65*sx, -.75, -.09]) / np.linalg.norm([.65, -.75, -.09])
-        fa = bone(f'forearm.{side}', up, elbow, [.56*sx, -.81, .17])
-        hand = elbow + .23 * np.array([.56*sx, -.81, .17]) / np.linalg.norm([.56, -.81, .17])
-        bone(f'hand.{side}', fa, hand, [.36*sx, -.93, .1])
+        elbow = np.array([0.24 * sx, 1.32, 0]) + 0.29 * np.array([0.65 * sx, -0.75, -0.09]) / np.linalg.norm(
+            [0.65, -0.75, -0.09]
+        )
+        fa = bone(f'forearm.{side}', up, elbow, [0.56 * sx, -0.81, 0.17])
+        hand = elbow + 0.23 * np.array([0.56 * sx, -0.81, 0.17]) / np.linalg.norm([0.56, -0.81, 0.17])
+        bone(f'hand.{side}', fa, hand, [0.36 * sx, -0.93, 0.1])
 
     # One small skinned triangle per joint so every bone visibly deforms something.
     positions, jidx, weights, inverse = [], [], [], []
     for j, index in enumerate(joints):
         head = world[index][0]
-        positions += [head + [-.02, 0, 0], head + [.02, 0, 0], head + [0, .04, 0]]
+        positions += [head + [-0.02, 0, 0], head + [0.02, 0, 0], head + [0, 0.04, 0]]
         jidx += [[j, 0, 0, 0]] * 3
         weights += [[1, 0, 0, 0]] * 3
         h, r = world[index]
         from homunculus.retarget.character import qmat
-        m = np.eye(4); m[:3, :3] = qmat(r); m[:3, 3] = h
+
+        m = np.eye(4)
+        m[:3, :3] = qmat(r)
+        m[:3, 3] = h
         inverse.append(np.linalg.inv(m).T.reshape(-1).tolist())  # column-major
-    binary = bytearray(); views = []; accessors = []
+    binary = bytearray()
+    views = []
+    accessors = []
 
     def add(fmt, rows, kind, ctype, extra=None):
         flat = [v for row in rows for v in row]
         binary.extend(b'\0' * (-len(binary) % 4))
-        views.append({'buffer': 0, 'byteOffset': len(binary), 'byteLength': struct.calcsize('<' + fmt*len(flat))})
-        binary.extend(struct.pack('<' + fmt*len(flat), *flat))
-        accessors.append({'bufferView': len(views)-1, 'componentType': ctype, 'count': len(rows), 'type': kind, **(extra or {})})
+        views.append(
+            {'buffer': 0, 'byteOffset': len(binary), 'byteLength': struct.calcsize('<' + fmt * len(flat))}
+        )
+        binary.extend(struct.pack('<' + fmt * len(flat), *flat))
+        accessors.append(
+            {
+                'bufferView': len(views) - 1,
+                'componentType': ctype,
+                'count': len(rows),
+                'type': kind,
+                **(extra or {}),
+            }
+        )
         return len(accessors) - 1
 
     pts = np.array(positions)
@@ -95,14 +117,31 @@ def build(drop_bone=None):
     mesh_node = len(nodes)
     nodes.append({'name': 'Test_Mesh', 'mesh': 0, 'skin': 0})
     nodes.append({'name': 'Test_Rig', 'children': [mesh_node, root]})
-    doc = {'asset': {'version': '2.0', 'generator': 'Homunculus test character'}, 'scene': 0,
-           'scenes': [{'nodes': [len(nodes) - 1]}], 'nodes': nodes,
-           'meshes': [{'primitives': [{'attributes': {'POSITION': pos, 'JOINTS_0': jo, 'WEIGHTS_0': we}, 'material': 0}]}],
-           'materials': [{'pbrMetallicRoughness': {'baseColorFactor': [.3, .3, .3, 1]}, 'doubleSided': True}],
-           'skins': [{'joints': joints, 'inverseBindMatrices': ib}],
-           'animations': [{'name': 'Licensed_Source_Clip', 'samplers': [{'input': clip_t, 'output': clip_r}],
-                           'channels': [{'sampler': 0, 'target': {'node': chest, 'path': 'rotation'}}]}],
-           'buffers': [{'byteLength': len(binary) + (-len(binary) % 4)}], 'bufferViews': views, 'accessors': accessors}
+    doc = {
+        'asset': {'version': '2.0', 'generator': 'Homunculus test character'},
+        'scene': 0,
+        'scenes': [{'nodes': [len(nodes) - 1]}],
+        'nodes': nodes,
+        'meshes': [
+            {
+                'primitives': [
+                    {'attributes': {'POSITION': pos, 'JOINTS_0': jo, 'WEIGHTS_0': we}, 'material': 0}
+                ]
+            }
+        ],
+        'materials': [{'pbrMetallicRoughness': {'baseColorFactor': [0.3, 0.3, 0.3, 1]}, 'doubleSided': True}],
+        'skins': [{'joints': joints, 'inverseBindMatrices': ib}],
+        'animations': [
+            {
+                'name': 'Licensed_Source_Clip',
+                'samplers': [{'input': clip_t, 'output': clip_r}],
+                'channels': [{'sampler': 0, 'target': {'node': chest, 'path': 'rotation'}}],
+            }
+        ],
+        'buffers': [{'byteLength': len(binary) + (-len(binary) % 4)}],
+        'bufferViews': views,
+        'accessors': accessors,
+    }
     return write_glb(doc, binary)
 
 

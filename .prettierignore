@@ -1,0 +1,4 @@
+web/vendor/
+node_modules/
+outputs/
+private/

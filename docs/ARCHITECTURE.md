@@ -50,5 +50,8 @@ files), `.env.local` (keys and character path), `node_modules/`.
 
 - Imports are absolute from the repository root: `from homunculus.physics.settings import Edit`.
   Run Python from the root (`python -m pytest`, `python server.py`, `python scripts/measure.py`).
+- Formatting: Black for Python and Prettier for `web/` and the browser specs, both at
+  110 columns with single quotes (`pyproject.toml`, `.prettierrc.json`). Run them before
+  committing: `python -m black .` and `npx prettier@3.3.3 --write web tests/browser`.
 - On the GPU node the deployed folder holds `homunculus/` (only `contracts.py` and
   `capture/` are needed) and `worker/`; start it with `python -m worker.service`.
