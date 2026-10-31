@@ -368,6 +368,7 @@ def retarget_body(result, rig, capture, keys=None, sigma=SMOOTH_SIGMA_S, physics
     return {
         'schema': 'homunculus.retarget.v2',
         'mode': 'body',
+        'physics_arm': physics_arm,
         'character': rig.source,
         'side': side,
         'bones': BODY_BONES,
@@ -379,8 +380,13 @@ def retarget_body(result, rig, capture, keys=None, sigma=SMOOTH_SIGMA_S, physics
         'character_to_puppet': np.eye(3).tolist(),
         'leg_scale': float(scale),
         'note': (
-            'Kinematic full-body retarget from SAM keypoints; the captured arm uses the physics result. '
-            'In place: pelvis height from hips above the lowest leg point. No foot IK or contact cleanup.'
+            'Kinematic full-body retarget from SAM keypoints; '
+            + (
+                'the captured arm uses the physics result. '
+                if physics_arm
+                else 'the captured arm follows the recording. '
+            )
+            + 'In place: pelvis height from hips above the lowest leg point. No foot IK or contact cleanup.'
         ),
         'frames': out,
     }

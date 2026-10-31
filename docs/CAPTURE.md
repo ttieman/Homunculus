@@ -58,6 +58,14 @@ its original dimensions; this is directional retargeting, not metric mocap.
 Source revision, checkpoint/MHR/video hashes, crop, side, runtime and allocation
 telemetry remain in the bundle. Default FOV is labelled uncalibrated.
 
+## Run SAM on this PC (testing)
+
+**Use this PC's GPU** in the Import panel switches new jobs to a local worker in the
+`homunculus-sam` WSL distro and starts it; turning it off stops it. It is off each time the
+editor starts. Install once with `scripts/setup_local_sam.sh`; the header lists the steps,
+including Hugging Face access to the gated checkpoint. Earlier captures peaked at 5.79 GiB of
+allocated GPU memory, which is tight on an 8 GB card, so close other GPU programs first.
+
 ## Use the editor
 
 1. Optionally select the original video for local preview.

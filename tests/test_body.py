@@ -383,3 +383,14 @@ def test_server_retargets_the_whole_body_when_the_capture_has_it(rig, scenario):
         server.shutdown()
         server.server_close()
         worker.join()
+
+
+@pytest.mark.parametrize('physics_arm', [False, True])
+def test_export_records_the_actual_arm_driver(rig, scenario, physics_arm):
+    capture, _, result, _ = scenario
+    retargeted = retarget_body(result, rig, capture, physics_arm=physics_arm)
+    document, _ = read_glb(export_character_glb(rig, retargeted))
+    metadata = document['extras']['homunculus']
+    assert metadata['physics_arm'] is physics_arm
+    assert ('uses the physics result' in metadata['note']) is physics_arm
+    assert ('follows the recording' in metadata['note']) is (not physics_arm)

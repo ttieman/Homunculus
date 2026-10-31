@@ -79,7 +79,7 @@ compare. See `homunculus/retarget/rig.py` and `arm.py` for the exact conventions
 **Full skeleton.** Captures that carry SAM's 70 body keypoints drive all 19
 moving bones (pelvis, spine, chest, neck, head, clavicles, arms, hands, legs and
 feet) and the pelvis height, exported as a `Homunculus_Body` clip. The captured
-arm still comes from the physics result; the rest is kinematic and stays in
+arm follows the recording by default (physics driving is optional); the rest is kinematic and stays in
 place (no travel, no foot IK). The rig also needs `root` at the origin and
 `pelvis, spine, chest, neck, head, thigh/shin/foot/toe.L|R`. New worker runs
 record the keypoints; for an older run with its `raw-*.npz` files:
@@ -109,6 +109,7 @@ Published baseline evidence is in [docs/evidence](docs/evidence/).
 The shoulder is fixed to the world; the surrounding body silhouette is scenery.
 No free-standing balance or human muscle-force reconstruction is claimed.
 
+- [Export and Bevy preview](docs/EXPORT_PREVIEW.md)
 - [Plan](docs/PLAN.md)
 - [Setup](docs/SETUP.md)
 - [Video to physical arm](docs/CAPTURE.md)

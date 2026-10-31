@@ -12,17 +12,87 @@ export function createWorkspace(app) {
   const attachments = new Map();
   let messages = [];
   let nextId = 1;
-  const log = (role, text) => {
-    const item = document.createElement('div');
-    item.className = 'chat-entry';
-    const label = document.createElement('strong');
-    label.textContent = role;
-    const body = document.createElement('p');
-    body.textContent = text;
-    item.append(label, body);
-    $('chat-log').append(item);
-    item.scrollIntoView({ block: 'nearest' });
+  const element = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
   };
+  const scrollChat = () => {
+    const box = $('chat-scroll');
+    box.scrollTop = box.scrollHeight;
+  };
+  // Model text is escaped before the small Markdown subset is applied.
+  const markdown = text => {
+    const escaped = text.replace(
+      /[&<>"]/g,
+      c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c],
+    );
+    const inline = s =>
+      s.replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    return escaped
+      .split(/\n{2,}/)
+      .map(block => {
+        const lines = block.split('\n');
+        if (lines.every(l => /^\s*([-*]|\d+\.)\s+/.test(l))) {
+          const tag = /^\s*\d+\./.test(lines[0]) ? 'ol' : 'ul';
+          return `<${tag}>${lines.map(l => `<li>${inline(l.replace(/^\s*([-*]|\d+\.)\s+/, ''))}</li>`).join('')}</${tag}>`;
+        }
+        return `<p>${inline(lines.join('<br>'))}</p>`;
+      })
+      .join('');
+  };
+  const post = node => {
+    $('chat-empty').hidden = true;
+    $('chat-log').append(node);
+    scrollChat();
+    return node;
+  };
+  const say = {
+    user(text, images) {
+      const row = element('div', 'chat-msg chat-user');
+      const bubble = element('div', 'chat-bubble', text);
+      if (images.length) {
+        const strip = element('div', 'chat-images');
+        for (const a of images) {
+          const img = element('img');
+          img.src = a.dataURL;
+          img.alt = a.name;
+          strip.append(img);
+        }
+        bubble.prepend(strip);
+      }
+      row.append(bubble);
+      post(row);
+    },
+    muse(text) {
+      const row = element('div', 'chat-msg chat-muse');
+      const body = element('div', 'chat-text');
+      body.innerHTML = markdown(text);
+      row.append(body);
+      post(row);
+    },
+    tool(name, args, receipt) {
+      const card = element('details', 'chat-tool ' + (receipt.ok ? 'ok' : 'failed'));
+      const summary = element('summary');
+      summary.append(
+        element('span', 'chat-tool-icon', receipt.ok ? '✓' : '✕'),
+        element('span', 'chat-tool-name', name.replaceAll('_', ' ')),
+        element('span', 'chat-tool-state', receipt.ok ? 'Tool completed' : 'Tool failed'),
+      );
+      const detail = element(
+        'pre',
+        '',
+        JSON.stringify({ arguments: args, result: receipt.result ?? receipt.error }, null, 2),
+      );
+      card.append(summary, detail);
+      post(card);
+    },
+    notice(text, error = false) {
+      post(element('div', 'chat-notice' + (error ? ' error' : ''), text));
+    },
+  };
+  const log = (role, text) => say.notice(`${role}: ${text}`, /error/i.test(role));
   function syncScene() {
     app.configureScene(scene);
     $('scene-background').value = scene.background;
@@ -51,10 +121,36 @@ export function createWorkspace(app) {
   const handlers = {
     ...app.actions,
     inspect_workspace: async () => state(),
+    compose_motion: async args => {
+      const item = args.sourceId ? attachments.get(args.sourceId) : null;
+      if (args.mode !== 'mask' && item?.kind !== 'capture')
+        throw Error('Choose an attached capture for the second animation.');
+      return app.actions.compose_motion(args, args.mode === 'mask' ? null : item.data);
+    },
     set_scene: async args => {
       scene = { ...scene, ...structuredClone(args) };
       syncScene();
       return { scene, physics: 'Props are visual only; simulated collision uses the obstacle setting.' };
+    },
+    // Library files pass through the normal attachment path but do not stay attached.
+    open_library_asset: async ({ id }) => {
+      const opened = await app.openAsset(id);
+      if (!opened.file) return opened.result;
+      const item = await attach(opened.file);
+      try {
+        const value = await handlers.use_attachment({ id: item.id });
+        opened.done?.();
+        return value;
+      } finally {
+        detach(item.id);
+      }
+    },
+    save_to_library: async ({ format }) => {
+      if (format !== 'scene') return app.actions.save_to_library({ format });
+      return app.saveAsset(
+        'scene.json',
+        JSON.stringify({ schema: 'homunculus.scene.v1', scene, settings: app.inspect().settings }),
+      );
     },
     undo: async () => {
       if (!undo.length) throw Error('Nothing to undo');
@@ -78,6 +174,7 @@ export function createWorkspace(app) {
         return { status: 'Local video preview selected; SAM inference has not run.' };
       }
       if (item.kind === 'capture') return app.useCapture(item.data);
+      if (item.kind === 'project') return app.loadProject(item.data);
       if (item.kind === 'scene') {
         const d = item.data;
         if (d.schema !== 'homunculus.scene.v1') throw Error('Unsupported scene');
@@ -105,6 +202,12 @@ export function createWorkspace(app) {
     },
   };
   async function perform(name, args = {}, source = 'manual') {
+    if (name === 'navigate_stage') {
+      await app.validate(name, args);
+      const value = await app.actions.navigate_stage(args);
+      revision++;
+      return { ok: true, command: name, source, result: value, revision };
+    }
     if (executing || app.busy()) throw Error('Another operation is still running');
     executing = true;
     $('undo').disabled = true;
@@ -115,7 +218,18 @@ export function createWorkspace(app) {
       if (!handlers[name]) throw Error('Command is not implemented');
       before = snapshot();
       const value = await handlers[name](args);
-      if (!['inspect_workspace', 'playback', 'export_asset', 'undo', 'redo'].includes(name)) {
+      if (
+        ![
+          'inspect_workspace',
+          'navigate_stage',
+          'playback',
+          'export_asset',
+          'list_library',
+          'save_to_library',
+          'undo',
+          'redo',
+        ].includes(name)
+      ) {
         undo.push(before);
         if (undo.length > 30) undo.shift();
         redo = [];
@@ -141,7 +255,10 @@ export function createWorkspace(app) {
   function bind(id, name, args = () => ({})) {
     $(id).onclick = () => manual(name, args()).catch(() => {});
   }
-  bind('apply', 'set_settings', () => ({ edit: app.fields() }));
+  bind('apply', 'set_settings', () => {
+    const rotation = app.pendingRotation();
+    return { edit: app.fields(), ...(rotation ? { rotation } : {}) };
+  });
   bind('optimize', 'optimize');
   bind('use-fixture', 'use_demo');
   bind('undo', 'undo');
@@ -157,6 +274,8 @@ export function createWorkspace(app) {
     ['save-scene', 'scene'],
   ])
     bind(id, 'export_asset', () => ({ format }));
+  for (const format of ['character', 'project', 'scene'])
+    bind('library-save-' + format, 'save_to_library', () => ({ format }));
   bind('apply-scene', 'set_scene', () => ({
     background: $('scene-background').value,
     grid: $('scene-grid').checked,
@@ -177,7 +296,7 @@ export function createWorkspace(app) {
   }));
   bind('clear-props', 'set_scene', () => ({ props: [] }));
   $('timeline').oninput = () =>
-    manual('playback', { time: Number($('timeline').value) * app.inspect().settings.edit.duration }).catch(
+    manual('playback', { time: Number($('timeline').value) * app.inspect().playback.duration }).catch(
       () => {},
     );
   $('character-view').onchange = () =>
@@ -187,6 +306,9 @@ export function createWorkspace(app) {
   // A control edited while a model request is in flight makes its proposed calls stale.
   for (const id of ['duration', 'shoulder_deg', 'elbow_deg', 'strength', 'damping', 'obstacle'])
     $(id).addEventListener('input', () => revision++);
+  document.addEventListener('change', e => {
+    if (e.target.closest('.composition-panel')) revision++;
+  });
   async function attach(file) {
     if (attachments.size >= 12) throw Error('Remove an attachment before adding more (limit 12).');
     let kind =
@@ -201,9 +323,16 @@ export function createWorkspace(app) {
     const item = { id: 'media-' + nextId++, name: file.name, kind, file };
     if (kind === 'json') {
       item.data = JSON.parse(await file.text());
-      item.kind = item.data.schema === 'homunculus.scene.v1' ? 'scene' : 'capture';
+      item.kind =
+        item.data.schema === 'homunculus.project.v1'
+          ? 'project'
+          : item.data.schema === 'homunculus.scene.v1'
+            ? 'scene'
+            : 'capture';
       if (item.kind === 'capture') await app.validateCapture(item.data);
-      else {
+      else if (item.kind === 'project') {
+        await app.validateCapture(item.data.capture);
+      } else {
         await app.validate('set_scene', item.data.scene);
         await app.validate('set_settings', item.data.settings);
       }
@@ -220,28 +349,34 @@ export function createWorkspace(app) {
     renderAttachments();
     return item;
   }
+  function detach(id) {
+    attachments.delete(id);
+    renderAttachments();
+  }
   function renderAttachments() {
+    app.attachmentsChanged?.();
     $('chat-attachments').replaceChildren();
     for (const item of attachments.values()) {
-      const row = document.createElement('div');
-      row.className = 'attachment';
-      const label = document.createElement('span');
-      label.textContent = `${item.id}: ${item.name} (${item.kind})`;
-      row.append(label);
+      const row = element('div', 'attachment');
+      row.title = `${item.id}: ${item.name}`;
       if (item.kind === 'image') {
-        const img = document.createElement('img');
+        const img = element('img');
         img.src = item.dataURL;
         img.alt = item.name;
-        img.width = 70;
         row.append(img);
-      } else {
-        const use = document.createElement('button');
-        use.textContent = 'Use';
+      } else row.append(element('span', 'attachment-kind', item.kind === 'video' ? '▶' : '{ }'));
+      const label = element('span', 'attachment-name');
+      label.append(element('span', '', item.name), element('small', '', item.kind));
+      row.append(label);
+      if (item.kind !== 'image') {
+        const use = element('button', 'attachment-use', 'Use');
+        use.type = 'button';
         use.onclick = () => manual('use_attachment', { id: item.id }).catch(() => {});
         row.append(use);
       }
-      const remove = document.createElement('button');
-      remove.textContent = 'Remove';
+      const remove = element('button', 'attachment-remove', '×');
+      remove.type = 'button';
+      remove.title = remove.ariaLabel = 'Remove ' + item.name;
       remove.onclick = () => {
         attachments.delete(item.id);
         revision++;
@@ -274,9 +409,18 @@ export function createWorkspace(app) {
       }
     }
   });
+  let dragDepth = 0;
+  $('chat-panel').ondragenter = e => {
+    if (e.dataTransfer?.types.includes('Files') && ++dragDepth === 1) $('chat-drop').hidden = false;
+  };
+  $('chat-panel').ondragleave = () => {
+    if (dragDepth && --dragDepth === 0) $('chat-drop').hidden = true;
+  };
   $('chat-panel').ondragover = e => e.preventDefault();
   $('chat-panel').ondrop = async e => {
     e.preventDefault();
+    dragDepth = 0;
+    $('chat-drop').hidden = true;
     for (const file of e.dataTransfer.files) {
       try {
         await attach(file);
@@ -287,12 +431,43 @@ export function createWorkspace(app) {
   };
   $('chat-stop').onclick = () => {
     stopped = true;
-    log('Workspace', 'Stopping after the current request or action completes.');
+    $('chat-stop').disabled = true;
+    say.notice('Stopping after the current request or action completes.');
   };
   $('chat-clear').onclick = () => {
     if (chatting) return;
     messages = [];
     $('chat-log').replaceChildren();
+    $('chat-empty').hidden = false;
+    $('chat-prompt').focus();
+  };
+  const fitPrompt = () => {
+    const box = $('chat-prompt');
+    box.style.height = 'auto';
+    box.style.height = Math.min(box.scrollHeight, 200) + 'px';
+    $('chat-send').disabled = chatting || !box.value.trim();
+  };
+  $('chat-prompt').addEventListener('input', fitPrompt);
+  $('chat-prompt').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      if (!$('chat-send').disabled) $('chat-send').click();
+    }
+  });
+  for (const chip of document.querySelectorAll('.chat-suggestions button'))
+    chip.onclick = () => {
+      $('chat-prompt').value = chip.textContent;
+      fitPrompt();
+      $('chat-prompt').focus();
+    };
+  const setChatting = value => {
+    chatting = value;
+    $('chat-typing').hidden = !value;
+    $('chat-stop').hidden = !value;
+    $('chat-stop').disabled = !value;
+    $('chat-send').hidden = value;
+    fitPrompt();
+    if (value) scrollChat();
   };
   fetch('/api/commands')
     .then(r => r.json())
@@ -306,10 +481,14 @@ export function createWorkspace(app) {
   fetch('/api/status')
     .then(r => r.json())
     .then(s => {
-      $('chat-status').textContent = 'Muse Spark: ' + s.meta;
+      const ready = s.meta.startsWith('configured');
+      $('chat-status').lastChild.textContent = ready
+        ? `${s.model} · key configured`
+        : 'No API key: add MODEL_API_KEY to .env.local';
+      $('chat-status').classList.toggle('ready', ready);
     })
     .catch(e => {
-      $('chat-status').textContent = e.message;
+      $('chat-status').lastChild.textContent = e.message;
     });
   $('run-command').onclick = async () => {
     try {
@@ -320,7 +499,11 @@ export function createWorkspace(app) {
     }
   };
   $('chat-send').onclick = async () => {
-    if (chatting || executing || app.busy()) return;
+    if (chatting) return;
+    if (executing || app.busy()) {
+      say.notice('Muse can start once the current operation finishes. Your message is still in the box.');
+      return;
+    }
     const text = $('chat-prompt').value.trim();
     if (!text) return;
     const images = [...attachments.values()].filter(a => a.kind === 'image');
@@ -328,10 +511,7 @@ export function createWorkspace(app) {
       log('Workspace', 'Use at most four image references per message.');
       return;
     }
-    chatting = true;
     stopped = false;
-    $('chat-send').disabled = true;
-    $('chat-stop').disabled = false;
     messages.push({
       role: 'user',
       content: [
@@ -340,7 +520,13 @@ export function createWorkspace(app) {
       ],
     });
     $('chat-prompt').value = '';
-    log('You', text);
+    say.user(text, images);
+    // Images now live in the conversation history; files Muse can act on stay attached.
+    if (images.length) {
+      for (const a of images) attachments.delete(a.id);
+      renderAttachments();
+    }
+    setChatting(true);
     try {
       for (let step = 0; step < 8; step++) {
         if (stopped) break;
@@ -348,39 +534,36 @@ export function createWorkspace(app) {
         const response = await app.chat({ messages, state: state() });
         const message = response.message;
         messages.push(message);
-        if (message.content) log('Muse', message.content);
+        if (message.content) say.muse(message.content);
         const calls = message.tool_calls || [];
         if (!calls.length) break;
         let blocked = stopped || base !== revision;
         for (const call of calls) {
-          let receipt;
+          let receipt, args;
           try {
             if (blocked || stopped)
               throw Error(
                 'Actions skipped because the workspace changed, a previous action failed, or Stop was pressed. Ask again.',
               );
-            receipt = await perform(call.function.name, JSON.parse(call.function.arguments), 'Muse');
+            args = JSON.parse(call.function.arguments);
+            receipt = await perform(call.function.name, args, 'Muse');
           } catch (e) {
             blocked = true;
             receipt = { ok: false, error: e.message };
           }
           messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(receipt) });
-          log(
-            receipt.ok ? 'Tool completed' : 'Tool failed',
-            call.function.name + ': ' + JSON.stringify(receipt.result || receipt.error),
-          );
+          say.tool(call.function.name, args ?? call.function.arguments, receipt);
         }
         if (blocked) break;
-        if (step === 7) log('Workspace', 'Reached the eight-step limit. Ask Muse to continue if needed.');
+        if (step === 7) say.notice('Reached the eight-step limit. Ask Muse to continue if needed.');
       }
     } catch (e) {
-      log('Muse error', e.message);
+      say.notice('Muse error: ' + e.message, true);
     } finally {
-      chatting = false;
-      $('chat-send').disabled = false;
-      $('chat-stop').disabled = true;
+      setChatting(false);
+      $('chat-prompt').focus();
     }
   };
   syncScene();
-  return { perform, manual, attach, state };
+  return { perform, manual, attach, detach, state };
 }

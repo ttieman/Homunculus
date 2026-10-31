@@ -344,6 +344,7 @@ export function createStage(canvas) {
       character.driven = null;
       character.action = character.mixer.clipAction(gltf.animations[0]);
       character.action.play();
+      return gltf.animations[0].duration;
     },
     setPath(points, replay = false) {
       path.geometry.dispose();
@@ -403,7 +404,7 @@ export function createStage(canvas) {
           } else if (pose.rotations) {
             // Retargets name their bones (full body: every bone + pelvis height); older ones drive one arm.
             const names = pose.bones || [`upper_arm.${pose.side}`, `forearm.${pose.side}`];
-            const key = names.join();
+            const key = names.join() + ':' + (pose.translationBone || '');
             if (character.driven !== key) {
               restAll();
               character.driven = key;

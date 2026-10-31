@@ -1,424 +1,52 @@
 <!doctype html>
-
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Homunculus · Motion workspace</title>
-
-    <style>
-      :root {
-        color-scheme: dark;
-        font-family:
-          Inter,
-          Segoe UI,
-          sans-serif;
-        background: #101518;
-        color: #edf3ee;
-        font-size: 14px;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-      }
-      button,
-      input,
-      textarea {
-        font: inherit;
-      }
-      button {
-        border: 1px solid #3b494b;
-        border-radius: 7px;
-        background: #263134;
-        color: #e9f1ed;
-        padding: 10px 15px;
-        cursor: pointer;
-      }
-      button:hover {
-        background: #3b4b4d;
-      }
-      button:disabled {
-        opacity: 0.4;
-        cursor: default;
-      }
-      .primary {
-        background: #b8f4b2;
-        color: #142b1a;
-        border: 0;
-        font-weight: 650;
-      }
-      .primary:hover {
-        background: #d0ffc9;
-      }
-      header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        border-bottom: 1px solid #303b3d;
-        padding: 20px 28px;
-      }
-      h1 {
-        font-size: 20px;
-        letter-spacing: -0.7px;
-        margin: 0;
-      }
-      h1 span {
-        font-weight: 400;
-        color: #8b9e9c;
-        font-size: 13px;
-        margin-left: 18px;
-      }
-      .badge {
-        font-size: 11px;
-        letter-spacing: 1.3px;
-        text-transform: uppercase;
-        color: #b8f4b2;
-      }
-      .layout {
-        display: grid;
-        grid-template-columns: minmax(480px, 1fr) 330px;
-        min-height: calc(100vh - 72px);
-      }
-      main {
-        padding: 28px;
-        min-width: 0;
-      }
-      aside {
-        background: #171e21;
-        border-left: 1px solid #303b3d;
-        padding: 26px 24px;
-      }
-      h2 {
-        font-size: 25px;
-        letter-spacing: -0.8px;
-        font-weight: 500;
-        margin: 8px 0 10px;
-      }
-      h3 {
-        font-size: 14px;
-        font-weight: 600;
-        margin: 0 0 18px;
-      }
-      p {
-        color: #9dadaa;
-        line-height: 1.6;
-      }
-      .eyebrow {
-        font-size: 11px;
-        letter-spacing: 2px;
-        color: #8b9e9c;
-        text-transform: uppercase;
-      }
-      .stage {
-        position: relative;
-        border: 1px solid #344143;
-        background: radial-gradient(ellipse at 40% 40%, #243234, #141c20);
-        border-radius: 12px;
-        overflow: hidden;
-        margin-top: 26px;
-      }
-      canvas {
-        width: 100%;
-        height: 440px;
-        display: block;
-        touch-action: none;
-        cursor: grab;
-      }
-      canvas:active {
-        cursor: grabbing;
-      }
-      .stage-label {
-        position: absolute;
-        left: 0;
-        top: 0;
-        pointer-events: none;
-        color: #c2d1c9;
-        font-size: 11px;
-        letter-spacing: 0.6px;
-        white-space: nowrap;
-      }
-      .stage-top {
-        position: absolute;
-        top: 18px;
-        left: 20px;
-        right: 20px;
-        display: flex;
-        justify-content: space-between;
-        color: #b0c0ba;
-        font-size: 12px;
-        pointer-events: none;
-      }
-      .legend {
-        display: flex;
-        gap: 16px;
-        font-size: 12px;
-        color: #9dacaa;
-        margin: 16px 0;
-      }
-      .dot {
-        display: inline-block;
-        border-radius: 50%;
-        width: 7px;
-        height: 7px;
-        margin-right: 6px;
-        background: #b8f4b2;
-      }
-      .dot.target {
-        background: #829898;
-      }
-      .dot.path {
-        background: transparent;
-        border: 1px dashed #b8f4b2;
-      }
-      .transport {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        padding: 15px 20px;
-        background: #151d20;
-        border-top: 1px solid #344143;
-      }
-      .transport input {
-        flex: 1;
-        min-width: 0;
-        accent-color: #b8f4b2;
-      }
-      .transport output {
-        font-variant-numeric: tabular-nums;
-        font-size: 12px;
-      }
-      .metrics {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        margin-top: 18px;
-      }
-      .metric {
-        border: 1px solid #303d3f;
-        border-radius: 8px;
-        padding: 16px;
-      }
-      .metric strong {
-        display: block;
-        font-size: 22px;
-        font-weight: 500;
-        margin: 7px 0;
-      }
-      .metric span {
-        color: #92a5a1;
-        font-size: 12px;
-      }
-      section + section {
-        border-top: 1px solid #324043;
-        padding-top: 24px;
-        margin-top: 24px;
-      }
-      label {
-        display: block;
-        color: #b5c3bd;
-        font-size: 12px;
-        margin: 18px 0 8px;
-      }
-      label output {
-        float: right;
-        color: #edf3ee;
-        font-variant-numeric: tabular-nums;
-      }
-      input[type='range'] {
-        width: 100%;
-        accent-color: #b8f4b2;
-      }
-      input[type='checkbox'] {
-        accent-color: #b8f4b2;
-      }
-      .row {
-        display: flex;
-        gap: 8px;
-        margin-top: 20px;
-      }
-      .row button {
-        flex: 1;
-      }
-      textarea {
-        resize: vertical;
-        width: 100%;
-        min-height: 85px;
-        border: 1px solid #425251;
-        border-radius: 8px;
-        padding: 12px;
-        background: #10191c;
-        color: #e9f1ed;
-        line-height: 1.5;
-      }
-      .note {
-        font-size: 12px;
-        line-height: 1.6;
-        color: #91a5a0;
-      }
-      .status {
-        padding: 12px;
-        border-left: 2px solid #d0b785;
-        background: #222823;
-        color: #ddd2ba;
-        font-size: 12px;
-        line-height: 1.6;
-        margin: 14px 0;
-      }
-      #proposal {
-        white-space: pre-wrap;
-        font-size: 12px;
-        color: #b8f4b2;
-      }
-      footer {
-        margin-top: 22px;
-        display: flex;
-        gap: 10px;
-      }
-      #message {
-        min-height: 20px;
-        font-size: 12px;
-        color: #dac393;
-      }
-      select {
-        background: #1d2a2c;
-        color: #dbe8df;
-        padding: 7px;
-        border: 1px solid #415351;
-        border-radius: 5px;
-      }
-      .subtitle {
-        margin: 0;
-        font-size: 13px;
-      }
-      @media (max-width: 850px) {
-        .layout {
-          grid-template-columns: 1fr;
-        }
-        aside {
-          border-left: 0;
-          border-top: 1px solid #303b3d;
-        }
-        main {
-          padding: 20px;
-        }
-        canvas {
-          height: 350px;
-        }
-        h1 span {
-          display: none;
-        }
-        .metrics {
-          gap: 6px;
-        }
-        .metric {
-          padding: 10px;
-        }
-      }
-
-      .compare-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 14px;
-      }
-      .compare-grid.has-video {
-        grid-template-columns: 1fr 1fr;
-      }
-      .source-pane {
-        min-width: 0;
-        background: #111a1d;
-        border: 1px solid #344143;
-        border-radius: 12px;
-        margin-top: 26px;
-        padding: 12px;
-      }
-      .source-pane video {
-        width: 100%;
-        height: 340px;
-        object-fit: contain;
-      }
-      .source-pane p {
-        font-size: 12px;
-      }
-      .has-video canvas {
-        height: 340px;
-      }
-      .comparison-active .layout {
-        grid-template-columns: 1fr;
-      }
-      .comparison-active aside {
-        border-left: 0;
-      }
-      .comparison-active main {
-        padding: 20px;
-      }
-      .compare-grid > * {
-        min-width: 0;
-      }
-      @media (max-width: 500px) {
-        .source-pane video,
-        .has-video canvas {
-          height: 250px;
-        }
-      }
-
-      #chat-log {
-        max-height: 360px;
-        overflow: auto;
-        border: 1px solid #344143;
-        border-radius: 8px;
-        padding: 12px;
-      }
-      .chat-entry {
-        margin-bottom: 16px;
-      }
-      .chat-entry p {
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
-        margin: 5px 0;
-      }
-      .chat-entry strong {
-        color: #b8f4b2;
-      }
-      .attachment {
-        display: flex;
-        gap: 6px;
-        align-items: center;
-        flex-wrap: wrap;
-        font-size: 12px;
-        margin: 8px 0;
-      }
-      .attachment span {
-        overflow-wrap: anywhere;
-      }
-      .attachment button {
-        padding: 4px 8px;
-      }
-      .scene-position {
-        display: flex;
-        gap: 6px;
-      }
-      .scene-position input {
-        width: 30%;
-      }
-      #chat-panel textarea {
-        min-height: 90px;
-      }
-    </style>
+    <link rel="stylesheet" href="/workflow.css" />
   </head>
   <body>
     <header>
-      <h1>◈ Homunculus <span>Motion workspace</span></h1>
-      <span class="badge">Feasibility 01</span>
+      <div>
+        <h1>◈ Homunculus</h1>
+        <span class="note">Performance to animation</span>
+      </div>
+      <div id="history-controls"></div>
     </header>
-
+    <nav aria-label="Animation workflow">
+      <button data-step="4" aria-controls="step-4" title="Capture">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 8a2 2 0 012-2h9a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2zM16 10l5-3v10l-5-3" /></svg
+        ><span class="sr-only">Capture</span></button
+      ><button data-step="0" aria-controls="step-0" title="Import and library">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 20h16" /></svg
+        ><span class="sr-only">01 Import</span></button
+      ><button data-step="1" aria-controls="step-1" title="Review">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7zM12 15a3 3 0 100-6 3 3 0 000 6z" /></svg
+        ><span class="sr-only">02 Review</span></button
+      ><button data-step="2" aria-controls="step-2" title="Edit">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4" /></svg
+        ><span class="sr-only">03 Edit</span></button
+      ><button data-step="3" aria-controls="step-3" title="Export">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M4 20h16" /></svg
+        ><span class="sr-only">04 Export</span>
+      </button>
+    </nav>
     <div class="layout">
+      <button id="panel-close" class="chat-icon" title="Collapse menu" aria-label="Collapse menu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
       <main>
-        <div class="eyebrow">Performance / Supported reach</div>
-        <h2>Give motion a little resistance.</h2>
-        <p class="subtitle">Shape a reach. Let the body respond. Keep the result.</p>
-
+        <div class="viewer-heading">
+          <div>
+            <div class="eyebrow">ANIMATION PREVIEW</div>
+            <h2 id="clip-title">Sample reach</h2>
+          </div>
+          <button id="compare-source" aria-pressed="false" disabled>Compare source</button
+          ><button id="glb-close" hidden>Close GLB preview</button>
+        </div>
         <div id="comparison" class="compare-grid">
           <div id="source-pane" class="source-pane" hidden>
             <strong>Source recording</strong
@@ -430,10 +58,7 @@
               <span id="view-label">Physical result · fixed shoulder</span
               ><span>Drag to orbit · scroll to zoom · right-drag to pan · double-click to reset</span>
             </div>
-            <canvas
-              id="stage"
-              aria-label="3D view of the animated physical arm with reference target and obstacle"
-            ></canvas>
+            <canvas id="stage" aria-label="3D animation preview"></canvas>
 
             <div class="transport">
               <button id="play" aria-label="Pause playback">Pause</button
@@ -449,140 +74,489 @@
             </div>
           </div>
         </div>
-        <div class="legend">
-          <span><i class="dot"></i>Physical arm</span
-          ><span><i class="dot target"></i>Intended motion (ghost)</span
-          ><span><i class="dot path"></i>Hand path</span><span>▧ Fixed support</span
-          ><span id="physics-toggle" hidden
-            ><input id="show-physics" type="checkbox" />
-            <label for="show-physics" style="display: inline; margin: 0">Show physics arm</label>
-            <input id="physics-arm" type="checkbox" />
-            <label for="physics-arm" style="display: inline; margin: 0">Drive arm from physics</label></span
-          ><span id="view-toggle" hidden
-            ><label for="character-view" style="display: inline; margin: 0">Recording view</label>
-            <select id="character-view">
-              <option value="auto">Auto</option>
-              <option value="front">Facing camera</option>
-              <option value="side">Side-on</option>
-            </select></span
-          >
-        </div>
-
-        <div class="metrics">
-          <div class="metric">
-            <span>Tracking error</span><strong id="error">—</strong><span>RMS across joint axes</span>
+        <p id="message" role="status">Preparing preview…</p>
+        <details>
+          <summary>Preview details</summary>
+          <div class="legend">
+            <span><i class="dot"></i>Physical arm</span
+            ><span><i class="dot target"></i>Intended motion (ghost)</span
+            ><span><i class="dot path"></i>Hand path</span><span>▧ Fixed support</span
+            ><span id="physics-toggle" hidden
+              ><input id="show-physics" type="checkbox" />
+              <label for="show-physics" style="display: inline; margin: 0">Show physics arm</label>
+              <input id="physics-arm" type="checkbox" />
+              <label for="physics-arm" style="display: inline; margin: 0">Drive arm from physics</label></span
+            ><span id="view-toggle" hidden
+              ><label for="character-view" style="display: inline; margin: 0">Recording view</label>
+              <select id="character-view">
+                <option value="auto">Auto</option>
+                <option value="front">Facing camera</option>
+                <option value="side">Side-on</option>
+              </select></span
+            >
           </div>
-          <div class="metric">
-            <span>Contact</span><strong id="contact">—</strong><span>Physics steps touching</span>
+          <div class="metrics">
+            <div class="metric">
+              <span>Tracking error</span><strong id="error">—</strong><span>RMS across joint axes</span>
+            </div>
+            <div class="metric">
+              <span>Contact</span><strong id="contact">—</strong><span>Physics steps touching</span>
+            </div>
+            <div class="metric">
+              <span>Simulation time</span><strong id="speed">—</strong><span>For the complete clip</span>
+            </div>
           </div>
-          <div class="metric">
-            <span>Simulation time</span><strong id="speed">—</strong><span>For the complete clip</span>
-          </div>
-        </div>
-
-        <footer>
-          <button id="export">Export glTF</button
-          ><button id="export-character" hidden disabled>Export character GLB</button
-          ><button id="replay">Replay export</button><button id="save">Save session</button>
-        </footer>
-
-        <p id="message" role="status">Preparing the supported reach…</p>
-
-        <p class="note" id="character-note"></p>
-        <p class="note" id="source-note">
-          Original procedural reference · MuJoCo torque control · Shoulder anchored to the world.<br />Full-body
-          balance and game retargeting are not included.
-        </p>
+          <p id="character-note" class="note"></p>
+          <p id="source-note" class="note"></p>
+        </details>
       </main>
       <aside>
-        <section>
-          <div class="eyebrow">00 / Reference</div>
-          <h3 style="margin-top: 12px">Bring a performance</h3>
+        <section id="step-0">
+          <div class="library">
+            <div class="library-side">
+              <h2>Library</h2>
+              <div id="library-categories" role="group" aria-label="Asset categories"></div>
+              <div class="library-actions">
+                <button id="library-show-import" class="primary" aria-expanded="false">Import</button
+                ><button id="library-export" title="Export the current animation">Export</button>
+              </div>
+            </div>
+            <div id="library-browse" class="library-main">
+              <div class="library-toolbar">
+                <input
+                  id="library-search"
+                  type="search"
+                  aria-label="Search the library"
+                  placeholder="Search assets…"
+                />
+                <div class="library-pickers">
+                  <label for="library-sort">Sort</label
+                  ><select id="library-sort">
+                    <option value="modified">Last modified</option>
+                    <option value="created">Date created</option>
+                    <option value="name">Name</option>
+                    <option value="size">Size</option>
+                  </select>
+                  <label for="library-filter">Filter</label
+                  ><select id="library-filter">
+                    <option value="any">Everything</option>
+                    <option value="full-body">Full body</option>
+                    <option value="arm-only">Arm only</option>
+                    <option value="has-source">Has source video</option>
+                    <option value="unconverted">Not converted</option>
+                    <option value="recent">Changed this week</option>
+                  </select>
+                </div>
+              </div>
+              <p id="library-status" role="status"></p>
+              <div id="library-grid"></div>
+              <p id="library-empty" class="note"></p>
+            </div>
+            <div id="library-import" class="library-main" hidden>
+              <button id="library-import-back" class="library-back">← Back to library</button>
+              <h2>Bring your performance</h2>
+              <label for="library-files">Add files to the library</label
+              ><input
+                id="library-files"
+                type="file"
+                multiple
+                accept="video/*,.mp4,.webm,.mov,.mkv,.avi,.mpg,.glb,.json,application/json"
+              />
+              <p id="library-files-status" class="note" role="status"></p>
+              <p class="note">
+                Videos, character GLBs, and capture, project or scene JSON files are copied into local storage
+                and sorted by type.
+              </p>
+              <label for="project-file">Resume an animation project</label
+              ><input id="project-file" type="file" accept=".json,application/json" />
+              <p id="project-status" role="status"></p>
+              <p>
+                Choose a video to turn into character animation. Keep the entire person in frame for the best
+                result.
+              </p>
 
-          <label for="process-file">Process a video with SAM 3D Body</label
-          ><input id="process-file" type="file" accept="video/*,.mp4,.webm,.mov,.mkv,.avi,.mpg" />
+              <label for="process-file">Choose a performance video</label
+              ><input id="process-file" type="file" accept="video/*,.mp4,.webm,.mov,.mkv,.avi,.mpg" />
 
-          <label for="process-start">Start at (s)</label
-          ><input id="process-start" type="number" min="0" step="0.1" value="0" />
+              <label for="process-start">Start at (s)</label
+              ><input id="process-start" type="number" min="0" step="0.1" value="0" />
 
-          <p id="job-status" class="note" role="status">
-            Choose a clip (up to 30 s from Start at; .mkv and other formats are converted to mp4). The GPU
-            worker finds the person, reconstructs the body, and the whole skeleton is retargeted
-            automatically.
-          </p>
+              <p id="job-status" class="note" role="status">
+                Choose a clip (up to 30 s from Start at; .mkv and other formats are converted to mp4). The GPU
+                worker finds the person, reconstructs the body, and the whole skeleton is retargeted
+                automatically.
+              </p>
 
-          <label for="video-file">Preview your video locally</label
-          ><input id="video-file" type="file" accept="video/*" />
+              <label class="sam-toggle"><input id="sam-local" type="checkbox" /> Use this PC's GPU</label>
+              <p id="sam-status" class="note" role="status"></p>
+              <button id="process-submit" class="primary" disabled>Convert to animation</button
+              ><progress id="process-progress" hidden aria-label="Processing video"></progress>
+              <details>
+                <summary>Open an existing capture</summary>
+                <label for="video-file">Preview your video locally</label
+                ><input id="video-file" type="file" accept="video/*" />
 
-          <label for="capture-file">Import worker capture.json</label
-          ><input id="capture-file" type="file" accept="application/json,.json" />
+                <label for="capture-file">Import worker capture.json</label
+                ><input id="capture-file" type="file" accept="application/json,.json" />
 
-          <p id="capture-status" class="note" role="status">
-            Video stays in your browser. Process it on the SAM worker above, or import a capture.json made
-            with worker/capture_video.py. SAM weights are not bundled.
-          </p>
+                <p id="capture-status" class="note" role="status">
+                  Video stays in your browser. Process it on the SAM worker above, or import a capture.json
+                  made with worker/capture_video.py. SAM weights are not bundled.
+                </p>
 
-          <label
-            ><input id="review-capture" type="checkbox" /> I checked the overlay, person and axis
-            mapping</label
-          >
+                <label
+                  ><input id="review-capture" type="checkbox" /> I checked the overlay, person and axis
+                  mapping</label
+                >
 
-          <button id="use-capture" disabled>Use captured motion</button>
-          <button id="use-fixture">Use demo reach</button>
+                <button id="use-capture" disabled>Use captured motion</button>
+              </details>
+              <p class="note">Just exploring? Try a sample without uploading anything.</p>
+              <button id="use-fixture">Use demo reach</button>
+            </div>
+          </div>
         </section>
-        <section>
-          <div class="eyebrow">01 / Refine</div>
-          <h3 style="margin-top: 12px">Performance controls</h3>
+        <section id="step-1" hidden>
+          <div class="eyebrow">CHECK YOUR PERFORMANCE</div>
+          <h2>Does the motion look right?</h2>
+          <p id="review-summary"></p>
+          <ol class="review-list">
+            <li>Play the whole clip. Check the arms, legs and body direction.</li>
+            <li>Compare with the source recording when available.</li>
+            <li>Look for jumps or cropped limbs before editing.</li>
+          </ol>
+          <p class="note">
+            Capture may estimate body parts outside the frame. This preview does not automatically validate
+            their accuracy.
+          </p>
+          <button class="primary" data-go="2">Continue to editing</button
+          ><button data-go="0">Choose another clip</button>
+        </section>
+        <section id="step-2" hidden>
+          <h2>Shape the motion</h2>
+          <p>Adjust the duration, apply your changes, then watch the result.</p>
 
           <label for="duration">Duration <output id="duration-value"></output></label
           ><input id="duration" type="range" min="2" max="30" step=".01" value="4" />
 
-          <label for="shoulder_deg">Shoulder reach <output id="shoulder_deg-value"></output></label
-          ><input id="shoulder_deg" type="range" min="5" max="100" step="1" value="65" />
-
-          <label for="elbow_deg">Elbow bend <output id="elbow_deg-value"></output></label
-          ><input id="elbow_deg" type="range" min="-100" max="30" step="1" value="-35" />
-
-          <label for="strength">Muscle strength <output id="strength-value"></output></label
-          ><input id="strength" type="range" min=".1" max="2" step=".1" value="1" />
-
-          <label for="damping">Damping <output id="damping-value"></output></label
-          ><input id="damping" type="range" min=".2" max="3" step=".1" value="1" />
-
-          <label><input id="obstacle" type="checkbox" checked /> Place an obstacle in the reach</label>
-
           <div class="row">
-            <button id="apply" class="primary">Simulate edit</button><button id="undo" disabled>Undo</button
+            <button id="apply" class="primary">Apply changes</button><button id="undo" disabled>Undo</button
             ><button id="redo" disabled>Redo</button>
           </div>
-          <p><button id="optimize" disabled>Optimize captured motion</button></p>
-
-          <div>
-            <button id="three-poses" disabled>Assemble three poses</button>
-            <button id="save-reference" disabled>Save reference</button>
+          <p id="edit-status" role="status"></p>
+          <fieldset id="animation-rotation" disabled>
+            <legend>Animation rotation</legend>
+            <p class="note">
+              Rotate the whole character around its starting hips. Use pitch to correct camera tilt. Rotation
+              is included in character exports; feet are not automatically grounded.
+            </p>
+            <label for="rotation-pitch">Pitch X (degrees)</label
+            ><input id="rotation-pitch" type="number" min="-180" max="180" step="0.1" value="0" />
+            <label for="rotation-yaw">Yaw Y (degrees)</label
+            ><input id="rotation-yaw" type="number" min="-180" max="180" step="0.1" value="0" />
+            <label for="rotation-roll">Roll Z (degrees)</label
+            ><input id="rotation-roll" type="number" min="-180" max="180" step="0.1" value="0" />
+            <div class="row">
+              <button id="apply-rotation" class="primary">Apply rotation</button
+              ><button id="reset-rotation">Reset rotation</button>
+            </div>
+            <p id="rotation-status" role="status">Open a captured animation to rotate it.</p>
+          </fieldset>
+          <div class="composition-panel">
+            <div class="eyebrow">BODY TARGETS &amp; CLIP MIXER</div>
+            <h3>Choose what moves</h3>
+            <label for="composition-mode">How to use the selected joints</label
+            ><select id="composition-mode">
+              <option value="mask">Animate only these joints</option>
+              <option value="layer">Layer a second clip onto these joints</option>
+              <option value="sequence">Join a second clip after this one</option>
+            </select>
+            <label for="target-preset">Body selection</label
+            ><select id="target-preset">
+              <option>All joints</option>
+              <option>No joints</option>
+              <option>Left arm</option>
+              <option>Right arm</option>
+              <option>Left leg</option>
+              <option>Right leg</option>
+              <option>Torso</option>
+              <option>Head</option>
+            </select>
+            <details>
+              <summary>Choose individual joints</summary>
+              <div id="bone-targets"></div>
+            </details>
+            <label><input type="checkbox" id="composition-root" checked />Include pelvis translation</label>
+            <p class="note">
+              Only selected local joint tracks are exported in isolation mode. Other parts stay in their rest
+              pose here and can be driven by another animation in your game. Children still follow moving
+              parents.
+            </p>
+            <label for="composition-file">Attach a second animation (capture JSON)</label
+            ><input type="file" id="composition-file" accept=".json,application/json" />
+            <label for="composition-source">Second animation</label
+            ><select id="composition-source">
+              <option value="">Choose an attached capture</option>
+            </select>
+            <label for="composition-blend">Join transition (seconds)</label
+            ><input id="composition-blend" type="number" min="0" max="5" step=".05" value=".25" />
+            <p class="note">
+              Layering fits the second clip to the base duration. Joining overlaps the clips by the transition
+              time; unselected joints hold the base's final pose after it ends. These operations do not solve
+              foot contacts.
+            </p>
+            <button id="apply-composition" class="primary">Apply targets</button
+            ><button id="clear-composition">Restore full base</button>
+            <p id="composition-status" role="status"></p>
           </div>
+          <details>
+            <summary>Arm physics · optional</summary>
+            <p class="note">
+              These controls affect the supported arm. Enable Drive arm from physics to use that result on the
+              character.
+            </p>
+            <label for="shoulder_deg">Shoulder reach <output id="shoulder_deg-value"></output></label
+            ><input id="shoulder_deg" type="range" min="5" max="100" step="1" value="65" />
 
-          <label for="key-index">Keyframe number (starting at 1)</label
-          ><input id="key-index" type="number" min="1" value="2" />
+            <label for="elbow_deg">Elbow bend <output id="elbow_deg-value"></output></label
+            ><input id="elbow_deg" type="range" min="-100" max="30" step="1" value="-35" />
 
-          <label for="key-time">New keyframe time (seconds)</label
-          ><input id="key-time" type="number" min="0" max="30" step=".05" value="7" />
+            <label for="strength">Muscle strength <output id="strength-value"></output></label
+            ><input id="strength" type="range" min=".1" max="2" step=".1" value="1" />
 
-          <label for="key-curve">Timing curve</label
-          ><select id="key-curve">
-            <option value="linear">Linear / SLERP</option>
-            <option value="smoothstep">Ease in/out / SLERP</option>
-            <option value="hold">Hold</option>
-          </select>
+            <label for="damping">Damping <output id="damping-value"></output></label
+            ><input id="damping" type="range" min=".2" max="3" step=".1" value="1" />
 
-          <p><button id="edit-key" disabled>Apply keyframe edit</button></p>
+            <label><input id="obstacle" type="checkbox" checked /> Place an obstacle in the reach</label>
 
-          <p class="note">
-            Save reference preserves poses and timing. Reload with Import worker capture.json. Physics keeps
-            the shoulder fixed.
-          </p>
+            <div id="physics-home"></div>
+          </details>
+          <details>
+            <summary>Keyframes and timing</summary>
+            <p><button id="optimize" disabled>Optimize captured motion</button></p>
+
+            <div>
+              <button id="three-poses" disabled>Assemble three poses</button>
+              <button id="save-reference" disabled>Save reference</button>
+            </div>
+
+            <label for="key-index">Keyframe number (starting at 1)</label
+            ><input id="key-index" type="number" min="1" value="2" />
+
+            <label for="key-time">New keyframe time (seconds)</label
+            ><input id="key-time" type="number" min="0" max="30" step=".05" value="7" />
+
+            <label for="key-curve">Timing curve</label
+            ><select id="key-curve">
+              <option value="linear">Linear / SLERP</option>
+              <option value="smoothstep">Ease in/out / SLERP</option>
+              <option value="hold">Hold</option>
+            </select>
+
+            <p><button id="edit-key" disabled>Apply keyframe edit</button></p>
+
+            <p class="note">
+              Save reference preserves poses and timing. Reload with Import worker capture.json. Physics keeps
+              the shoulder fixed.
+            </p>
+          </details>
+          <details>
+            <summary>Correct an arm pose</summary>
+            <h3>Pose correction</h3>
+            <p class="note">
+              Uses the keyframe number above. Edits joint-local rotation; original observations are preserved.
+            </p>
+
+            <label for="pose-joint">Joint</label
+            ><select id="pose-joint">
+              <option value="shoulder">Shoulder</option>
+              <option value="elbow">Elbow (Z hinge)</option>
+            </select>
+
+            <label for="pose-axis">Local axis</label
+            ><select id="pose-axis">
+              <option>x</option>
+              <option>y</option>
+              <option selected>z</option>
+            </select>
+
+            <label for="pose-angle">Rotation change (degrees)</label
+            ><input id="pose-angle" type="number" min="-45" max="45" value="5" /><button id="adjust-pose">
+              Adjust pose
+            </button>
+          </details>
+          <details>
+            <summary>Physics for part of the clip</summary>
+            <h3>Segment physics</h3>
+            <p class="note">
+              Override strength and/or damping for a range of the clip, in source seconds (the "Matched
+              source" time). Physics shows on the character with Drive arm from physics ticked.
+            </p>
+            <label for="segment-id">Segment id (blank = next)</label
+            ><input id="segment-id" type="text" maxlength="40" placeholder="seg-1" />
+            <div class="row">
+              <label for="segment-start">Start (s)</label
+              ><input id="segment-start" type="number" min="0" step="0.1" value="0" /><label for="segment-end"
+                >End (s)</label
+              ><input id="segment-end" type="number" min="0" step="0.1" value="1" />
+            </div>
+            <div class="row">
+              <label for="segment-strength">Strength</label
+              ><input
+                id="segment-strength"
+                type="number"
+                min="0.1"
+                max="2"
+                step="0.1"
+                placeholder="—"
+              /><label for="segment-damping">Damping</label
+              ><input id="segment-damping" type="number" min="0.2" max="3" step="0.1" placeholder="—" />
+            </div>
+            <div class="row">
+              <label for="segment-blend">Blend (s)</label
+              ><input id="segment-blend" type="number" min="0" step="0.05" value="0.2" /><label
+                for="segment-curve"
+                >Curve</label
+              ><select id="segment-curve">
+                <option>smoothstep</option>
+                <option>linear</option>
+                <option>smootherstep</option>
+                <option>ease_in</option>
+                <option>ease_out</option>
+                <option>ease_in_out</option>
+                <option>expo_in</option>
+                <option>expo_out</option>
+                <option>step</option>
+              </select>
+            </div>
+            <p>
+              <button id="segment-apply">Apply segment</button>
+              <button id="segment-clear">Clear segments</button>
+            </p>
+            <pre id="segment-list" class="note">No segments.</pre>
+          </details>
+          <details>
+            <summary>Preview scene</summary>
+            <h3>Scene setup</h3>
+            <label for="scene-background">Background</label
+            ><input id="scene-background" type="color" value="#142024" />
+
+            <label><input id="scene-grid" type="checkbox" checked /> Show grid</label
+            ><label for="scene-light">Key light intensity</label
+            ><input id="scene-light" type="range" min="0" max="5" step=".1" value="2.1" />
+
+            <label for="scene-camera">Camera</label
+            ><select id="scene-camera">
+              <option>home</option>
+              <option>front</option>
+              <option>side</option>
+              <option>top</option>
+            </select>
+            <p>
+              <button id="apply-scene">Apply scene</button> <button id="save-scene">Save scene</button>
+              <button id="library-save-scene">Save scene to library</button>
+            </p>
+
+            <label for="prop-shape">Decorative prop</label
+            ><select id="prop-shape">
+              <option>box</option>
+              <option>sphere</option></select
+            ><label>Position X / Y / Z (metres)</label>
+            <div class="scene-position">
+              <input id="prop-x" aria-label="Prop X" type="number" value=".7" step=".1" /><input
+                id="prop-y"
+                aria-label="Prop Y"
+                type="number"
+                value=".15"
+                step=".1"
+              /><input id="prop-z" aria-label="Prop Z" type="number" value="0" step=".1" />
+            </div>
+            <p><button id="add-prop">Add prop</button> <button id="clear-props">Clear props</button></p>
+            <p class="note">
+              Props are visual only. The reach obstacle control enables simulated collision. Attach a saved
+              scene in chat to reload it.
+            </p>
+          </details>
+          <details>
+            <summary>Command inspector - same tools as Muse</summary>
+            <label for="command-name">Command</label
+            ><select id="command-name"></select
+            ><label for="command-arguments">JSON arguments</label
+            ><textarea id="command-arguments">{}</textarea><button id="run-command">Run command</button>
+            <pre id="command-result" style="white-space: pre-wrap; overflow-wrap: anywhere"></pre>
+          </details>
+          <p><button class="primary" data-go="3">Continue to export</button></p>
         </section>
-
+        <section id="step-3" hidden>
+          <div class="eyebrow">TAKE IT INTO YOUR GAME</div>
+          <h2>Export your animation</h2>
+          <p>Download the animated character as a GLB for Bevy or another glTF-compatible engine.</p>
+          <p id="export-status" role="status"></p>
+          <div id="primary-export"></div>
+          <p class="note">
+            Preview the exported animation before downloading. Save a reference to continue editing the
+            captured poses and timing later.
+          </p>
+          <div id="reference-export"></div>
+          <button id="save-project">Save animation project</button>
+          <div class="row">
+            <button id="library-save-character">Save GLB to library</button
+            ><button id="library-save-project">Save project to library</button>
+          </div>
+          <p class="note">
+            Projects retain both clips and your targeting recipe. Reference files retain only the base
+            capture.
+          </p>
+          <details>
+            <summary>Other export formats</summary>
+            <button id="export">Export glTF</button
+            ><button id="export-character" hidden disabled>Export character GLB</button
+            ><button id="replay">Replay export</button><button id="save">Save session</button>
+          </details>
+        </section>
+        <section id="step-4" hidden>
+          <div class="eyebrow">CAPTURE SESSION</div>
+          <h2>Record takes</h2>
+          <p id="camera-status" role="status"></p>
+          <button id="capture-enable" class="primary">Turn on camera</button>
+          <div id="capture-live-area" hidden>
+            <div class="capture-frame">
+              <video id="capture-live" aria-label="Live camera view" autoplay muted playsinline></video>
+              <div id="capture-overlay" aria-hidden="true"></div>
+            </div>
+            <button id="capture-record" class="primary">Record</button>
+            <div class="capture-settings">
+              <div>
+                <label for="capture-camera">Camera</label
+                ><select id="capture-camera"></select>
+              </div>
+              <div>
+                <label for="capture-countdown">Countdown</label
+                ><select id="capture-countdown">
+                  <option value="0">None</option>
+                  <option value="3" selected>3 seconds</option>
+                  <option value="5">5 seconds</option>
+                  <option value="10">10 seconds</option>
+                </select>
+              </div>
+            </div>
+            <p class="note">
+              Space starts and stops. Video only, 30 seconds at most. Every take of 2.1 s or more is saved to
+              the Library when you stop.
+            </p>
+          </div>
+          <p id="capture-worker" class="note" role="status"></p>
+          <div id="capture-take" hidden>
+            <h3>This session</h3>
+            <div id="capture-takes"></div>
+            <video id="capture-playback" aria-label="Recorded take" controls playsinline></video>
+            <button id="capture-use" class="primary">Convert to animation</button>
+            <div class="row">
+              <button id="capture-download">Download clip</button
+              ><button id="capture-discard">Remove from session</button>
+            </div>
+          </div>
+        </section>
         <section hidden>
           <div class="eyebrow">02 / Direct</div>
           <h3 style="margin-top: 12px">Describe the change</h3>
@@ -601,163 +575,102 @@
             edits and language edits share the same controls and undo history.
           </p>
         </section>
-
-        <section>
-          <h3>Pose correction</h3>
-          <p class="note">
-            Uses the keyframe number above. Edits joint-local rotation; original observations are preserved.
-          </p>
-
-          <label for="pose-joint">Joint</label
-          ><select id="pose-joint">
-            <option value="shoulder">Shoulder</option>
-            <option value="elbow">Elbow (Z hinge)</option>
-          </select>
-
-          <label for="pose-axis">Local axis</label
-          ><select id="pose-axis">
-            <option>x</option>
-            <option>y</option>
-            <option selected>z</option>
-          </select>
-
-          <label for="pose-angle">Rotation change (degrees)</label
-          ><input id="pose-angle" type="number" min="-45" max="45" value="5" /><button id="adjust-pose">
-            Adjust pose
-          </button>
-        </section>
-
-        <section>
-          <h3>Segment physics</h3>
-          <p class="note">
-            Override strength and/or damping for a range of the clip, in source seconds (the "Matched source"
-            time). Physics shows on the character with Drive arm from physics ticked.
-          </p>
-          <label for="segment-id">Segment id (blank = next)</label
-          ><input id="segment-id" type="text" maxlength="40" placeholder="seg-1" />
-          <div class="row">
-            <label for="segment-start">Start (s)</label
-            ><input id="segment-start" type="number" min="0" step="0.1" value="0" /><label for="segment-end"
-              >End (s)</label
-            ><input id="segment-end" type="number" min="0" step="0.1" value="1" />
-          </div>
-          <div class="row">
-            <label for="segment-strength">Strength</label
-            ><input id="segment-strength" type="number" min="0.1" max="2" step="0.1" placeholder="—" /><label
-              for="segment-damping"
-              >Damping</label
-            ><input id="segment-damping" type="number" min="0.2" max="3" step="0.1" placeholder="—" />
-          </div>
-          <div class="row">
-            <label for="segment-blend">Blend (s)</label
-            ><input id="segment-blend" type="number" min="0" step="0.05" value="0.2" /><label
-              for="segment-curve"
-              >Curve</label
-            ><select id="segment-curve">
-              <option>smoothstep</option>
-              <option>linear</option>
-              <option>smootherstep</option>
-              <option>ease_in</option>
-              <option>ease_out</option>
-              <option>ease_in_out</option>
-              <option>expo_in</option>
-              <option>expo_out</option>
-              <option>step</option>
-            </select>
-          </div>
-          <p>
-            <button id="segment-apply">Apply segment</button>
-            <button id="segment-clear">Clear segments</button>
-          </p>
-          <pre id="segment-list" class="note">No segments.</pre>
-        </section>
-
-        <section>
-          <h3>Scene setup</h3>
-          <label for="scene-background">Background</label
-          ><input id="scene-background" type="color" value="#142024" />
-
-          <label><input id="scene-grid" type="checkbox" checked /> Show grid</label
-          ><label for="scene-light">Key light intensity</label
-          ><input id="scene-light" type="range" min="0" max="5" step=".1" value="2.1" />
-
-          <label for="scene-camera">Camera</label
-          ><select id="scene-camera">
-            <option>home</option>
-            <option>front</option>
-            <option>side</option>
-            <option>top</option>
-          </select>
-          <p><button id="apply-scene">Apply scene</button> <button id="save-scene">Save scene</button></p>
-
-          <label for="prop-shape">Decorative prop</label
-          ><select id="prop-shape">
-            <option>box</option>
-            <option>sphere</option></select
-          ><label>Position X / Y / Z (metres)</label>
-          <div class="scene-position">
-            <input id="prop-x" aria-label="Prop X" type="number" value=".7" step=".1" /><input
-              id="prop-y"
-              aria-label="Prop Y"
-              type="number"
-              value=".15"
-              step=".1"
-            /><input id="prop-z" aria-label="Prop Z" type="number" value="0" step=".1" />
-          </div>
-          <p><button id="add-prop">Add prop</button> <button id="clear-props">Clear props</button></p>
-          <p class="note">
-            Props are visual only. The reach obstacle control enables simulated collision. Attach a saved
-            scene in chat to reload it.
-          </p>
-        </section>
-
-        <section id="chat-panel">
-          <div class="eyebrow">Muse / Workspace operator</div>
-          <h3 style="margin-top: 12px">Direct the workspace</h3>
-          <p id="chat-status" class="note" role="status">Checking Muse access...</p>
-          <div id="chat-log" role="log" aria-label="Muse conversation"></div>
-          <div id="chat-attachments"></div>
-
-          <label for="chat-files">Attach images, video, capture or scene JSON</label
-          ><input
-            id="chat-files"
-            type="file"
-            multiple
-            accept="image/png,image/jpeg,image/webp,image/gif,video/*,.mkv,.json"
-          />
-
-          <p class="note">
-            Drop files here or paste an image. Attached images and your message are sent to Meta when you
-            press Send. Videos stay local; they need SAM processing before they can drive motion.
-          </p>
-
-          <textarea
-            id="chat-prompt"
-            aria-label="Message Muse"
-            placeholder="Make the reach slower, switch to the front camera and add a blue box beside the character."
-          ></textarea>
-
-          <div class="row">
-            <button id="chat-send" class="primary">Send to Muse</button
-            ><button id="chat-stop" disabled>Stop</button><button id="chat-clear">New chat</button>
-          </div>
-          <p class="note">
-            Muse uses the same validated actions as the controls. Tool results appear above. Undo reverses
-            motion and scene changes.
-          </p>
-        </section>
-        <section>
-          <details>
-            <summary>Command inspector - same tools as Muse</summary>
-            <label for="command-name">Command</label
-            ><select id="command-name"></select
-            ><label for="command-arguments">JSON arguments</label
-            ><textarea id="command-arguments">{}</textarea><button id="run-command">Run command</button>
-            <pre id="command-result" style="white-space: pre-wrap; overflow-wrap: anywhere"></pre>
-          </details>
-        </section>
       </aside>
     </div>
+    <div id="muse-dock">
+      <section id="chat-panel">
+        <header class="chat-header">
+          <div class="chat-title">
+            <span class="chat-avatar" aria-hidden="true">M</span>
+            <div>
+              <strong>Muse</strong>
+              <p id="chat-status" role="status"><span class="chat-dot"></span>Checking Muse access...</p>
+            </div>
+          </div>
+          <div class="chat-actions">
+            <button id="chat-clear" class="chat-icon" title="New chat" aria-label="New chat">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+            </button>
+            <button id="chat-collapse" class="chat-icon" title="Collapse chat" aria-label="Collapse chat">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12" /></svg>
+            </button>
+          </div>
+        </header>
+
+        <div id="chat-scroll">
+          <div id="chat-empty">
+            <span class="chat-avatar chat-avatar-lg" aria-hidden="true">M</span>
+            <p>
+              Ask Muse to edit the animation. It uses the same validated actions as the controls, and Undo
+              reverses them.
+            </p>
+            <div class="chat-suggestions">
+              <button type="button">Make this six seconds long and softer</button>
+              <button type="button">Isolate the left forearm</button>
+              <button type="button">Show the side camera</button>
+            </div>
+          </div>
+          <div id="chat-log" role="log" aria-label="Muse conversation"></div>
+          <div id="chat-typing" hidden aria-live="polite">
+            <span></span><span></span><span></span><em>Muse is working…</em>
+          </div>
+        </div>
+
+        <div id="chat-composer">
+          <div id="chat-attachments"></div>
+          <textarea
+            id="chat-prompt"
+            rows="1"
+            aria-label="Message Muse"
+            placeholder="Message Muse…"
+          ></textarea>
+          <div class="chat-toolbar">
+            <label for="chat-files" class="chat-icon" title="Attach images, video, capture or scene JSON">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M21 11.5l-8.6 8.6a5 5 0 01-7.1-7.1l8.6-8.6a3.3 3.3 0 014.7 4.7l-8.6 8.6a1.7 1.7 0 01-2.4-2.4l7.9-7.9"
+                />
+              </svg>
+              <span class="sr-only">Attach images, video, capture or scene JSON</span>
+            </label>
+            <input
+              id="chat-files"
+              type="file"
+              multiple
+              accept="image/png,image/jpeg,image/webp,image/gif,video/*,.mkv,.json"
+            />
+            <span class="chat-hint">Enter to send · Shift+Enter for a new line</span>
+            <button id="chat-stop" class="chat-send" hidden disabled title="Stop" aria-label="Stop">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="7" y="7" width="10" height="10" rx="1.5" />
+              </svg>
+            </button>
+            <button id="chat-send" class="chat-send" title="Send" aria-label="Send to Muse" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+            </button>
+          </div>
+        </div>
+        <p class="chat-footnote">
+          Messages and attached images go to Meta when you send. Videos stay local until SAM processes them.
+        </p>
+        <div id="chat-drop" hidden>Drop files to attach</div>
+      </section>
+      <button id="chat-launcher" title="Open Muse chat" aria-label="Open Muse chat" hidden>
+        <span class="chat-avatar" aria-hidden="true">M</span>
+      </button>
+    </div>
+    <dialog id="library-delete" aria-labelledby="library-delete-title">
+      <h2 id="library-delete-title">Are you sure?</h2>
+      <p>
+        Delete <strong id="library-delete-name"></strong>? The file <code id="library-delete-file"></code> is
+        removed from this computer. This cannot be undone.
+      </p>
+      <p id="library-delete-error" role="alert"></p>
+      <div class="row">
+        <button id="library-delete-cancel">Cancel</button
+        ><button id="library-delete-confirm" class="danger">Delete</button>
+      </div>
+    </dialog>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

@@ -134,12 +134,16 @@ def export_character_glb(rig, retargeted, extras=None):
     doc['accessors'] = accessors
     doc['extras'] = {
         'homunculus': {
+            'animation_rotation': retargeted.get('animation_rotation', {'pitch': 0, 'yaw': 0, 'roll': 0}),
+            'rotation_pivot': retargeted.get('rotation_pivot'),
             'mode': retargeted.get('mode', 'arm'),
             'side': retargeted['side'],
             'bones': retargeted['bones'],
             'view': retargeted['view'],
             'mapping': retargeted['mapping'],
             'note': retargeted['note'],
+            **({'physics_arm': retargeted['physics_arm']} if 'physics_arm' in retargeted else {}),
+            **({'composition': retargeted['composition']} if 'composition' in retargeted else {}),
             **(extras or {}),
         }
     }

@@ -10,6 +10,14 @@ video clip ──► SAM 3D Body (GPU worker) ──► whole-skeleton retarget 
 
 This replaces the closed GitHub issues and the old "Next experiments" list.
 
+## Current priority
+
+User direction on 2026-10-29: improve usability before segment-speed work.
+The guided Import -> Review -> Edit -> Export interface is implemented locally.
+The Base Layer from grA's Excalidraw Homunculus scene (full-window 3D viewport, overlay menus,
+collapsible Muse chat) is implemented locally, 2026-10-30. The scene's Import/Library layer is implemented locally, 2026-10-30 (`web/library.js`, `homunculus/editor/library.py`).
+Next: user walkthrough of the latest full-body clip, then address concrete usability feedback.
+
 ## Done
 
 | Step | State |
@@ -100,7 +108,8 @@ responses only for protocol checks, never as claimed model quality.
 
 Bake timing into the character GLB clip (already uses the retargeted frames),
 name the clip after the source, and verify playback in `bevy-playground`
-(currently untested).
+(one full-body clip verified 2026-10-29; see EXPORT_PREVIEW.md). Naming clips
+after their source remains pending; current animation name is Homunculus_Body.
 
 ## Backlog (after the timing work)
 
@@ -123,3 +132,9 @@ name the clip after the source, and verify playback in `bevy-playground`
    endpoint get verified live in Phase 3.
 2. Preset names and the exact feel of each — tune once the speed lane exists.
 3. ~~Physics per segment?~~ Yes — both physics and speed; strength/damping first.
+
+
+User direction 2026-10-30: editable whole-animation rotation for camera-angle correction.
+Implemented in Edit: absolute pitch/yaw/roll, apply/reset, shared command, undo/redo,
+project/reference persistence and character GLB baking. See STATUS.md for pivot, order
+and the separate ground-contact/physics boundaries.

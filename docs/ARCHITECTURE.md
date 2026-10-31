@@ -17,7 +17,7 @@ video ──► worker/ ──────► homunculus/capture ──► homun
 |---|---|---|
 | `server.py` | Launcher for the editor (`python server.py`) | — |
 | `web/` | Browser editor: UI (`index.html`), state and wiring (`app.js`), 3D stage (`stage3d.js`), command dispatch + undo (`workspace.js`), SAM upload + job polling (`jobs.js`), frame sampling and arm placement (`motion-math.js`), segment list text (`segments.js`). New `web/*.js` files must be added to the server's file list in `editor/server.py` | `app.js` |
-| `homunculus/editor/` | Local HTTP server (`server.py`: every `/api/...` route) and the workspace command catalog shared by buttons and Muse (`commands.py`) | `server.py` `do_POST` |
+| `homunculus/editor/` | Local HTTP server (`server.py`: every `/api/...` route), the workspace command catalog shared by buttons and Muse (`commands.py`), and remote/local SAM worker selection (`sam_workers.py`) | `server.py` `do_POST` |
 | `homunculus/capture/` | Capture bundle (`homunculus.observations.v1`) → motion. `prepare.py` picks the path; `spatial.py` (3D arm, the one in use) or `planar.py` (original side-on arm); `quality.py` diagnostics | `prepare.py` |
 | `homunculus/physics/` | MuJoCo simulation. `settings.py` (the `Edit` authoring values), `simulate.py` (picks the arm), `spatial.py` (3D arm + gain search), `planar.py` (original arm) | `simulate.py` |
 | `homunculus/animation/` | Editable timing: `timeline.py` (keyframes, output→source time), `segments.py` (per-range physics), `pose_editor.py` (joint edits) | `timeline.py` |
@@ -41,7 +41,7 @@ files), `.env.local` (keys and character path), `node_modules/`.
    `private/clips/<time>-<name>/` and the page applies the capture.
 3. **Simulate** (`POST /api/simulate`): `capture.prepare` → `physics.simulate.run`
    → `export.gltf.export_gltf`; with a character, `retarget.body.retarget_body`
-   poses every bone and `retarget.character.export_character_glb` writes the GLB.
+   poses every bone and `retarget.character_glb.export_character_glb` writes the GLB.
 4. **Edit**: buttons and Muse both send workspace commands (`editor/commands.py`)
    through `web/workspace.js`, which validates, applies and records undo.
    Segment edits go to `POST /api/segments`, timing to `POST /api/reference`.
@@ -55,3 +55,39 @@ files), `.env.local` (keys and character path), `node_modules/`.
   committing: `python -m black .` and `npx prettier@3.3.3 --write web tests/browser`.
 - On the GPU node the deployed folder holds `homunculus/` (only `contracts.py` and
   `capture/` are needed) and `worker/`; start it with `python -m worker.service`.
+
+## Game export verification
+
+See [export and Bevy preview](EXPORT_PREVIEW.md). scripts/export_preview.py
+exports a saved full-body capture through the editor handler, validates the
+GLB, and writes evidence for Bevy Playground examples/homunculus_preview.rs.
+
+### Guided browser workflow (2026-10-29)
+
+`web/workflow.js` presents four steps around the existing command controls;
+`web/workflow.css` owns responsive layout and focus states. The single 3D canvas
+is a fixed full-window base layer. The steps are icon squares that open one
+floating panel, and the Muse chat is a collapsible corner window; on narrow
+screens opening one closes the other. Menus start collapsed on load.
+`web/library.js` and `homunculus/editor/library.py` own the Import/Library panel. Assets are plain files under
+`private/` (`clips/`, `exports/`, `projects/`, `scenes/`); titles, creation dates and the last opened asset are in
+`private/library.json`, so renaming never moves a file. `server.py --storage` selects another folder, and browser
+tests use one so they never touch real clips.
+`web/capture.js` owns the Capture panel: camera choice, countdown and browser recording
+(video only, webm, 2.1-30 s). A take stays local until Convert hands it to the Import upload path. `web/app.js` remains
+the state owner and supplies readiness to the workflow. File selection does not
+submit a worker job: Convert starts it explicitly, retains the file after failure,
+and shows indeterminate progress. Export checks applied settings in both UI and
+the shared command handler so a stale preview cannot silently become a download.
+
+
+### Whole-character animation rotation
+
+homunculus/animation/rotation.py validates capture.animation_rotation (pitch/yaw/roll,
+degrees) and applies one rigid transform to retargeted character tracks after composition.
+The first pelvis position is the fixed pivot; motion translation rotates around it.
+web/app.js owns the Edit fields and shared set_animation_rotation action; the capture
+metadata flows through existing snapshots, projects, references and library persistence.
+The character GLB contains the same transformed tracks as the preview; raw reference
+physics, camera mapping and input observations are unchanged. Reset uses the base
+retargeted result, avoiding accumulated rotations.

@@ -1,3 +1,27 @@
+// Choose between the remote worker and the one on this PC.
+export async function workerStatus() {
+  return (await fetch('/api/worker')).json();
+}
+export async function setWorkerMode(mode) {
+  const r = await fetch('/api/worker', { method: 'POST', body: JSON.stringify({ mode }) });
+  const reply = await r.json();
+  if (!r.ok) throw Error(reply.error || 'Could not switch worker');
+  return reply;
+}
+export function describeWorker(s) {
+  if (s.mode !== 'local')
+    return s.reachable ? 'Using the remote GPU worker.' : 'Remote GPU worker is not reachable right now.';
+  const low = s.gpu_free_mib != null && s.gpu_free_mib < s.gpu_needed_mib;
+  const free = s.gpu_free_mib == null ? '' : ` ${(s.gpu_free_mib / 1024).toFixed(1)} GB of GPU memory free.`;
+  return (
+    'Using this PC.' +
+    free +
+    (low
+      ? ` Earlier runs needed about ${(s.gpu_needed_mib / 1024).toFixed(1)} GB, so close other GPU programs first or the run may fail.`
+      : '')
+  );
+}
+
 // Upload a video to the SAM 3D Body worker (through the editor server) and follow the job.
 // Resolves with the finished job status, whose capture the server has saved in private/clips/.
 export async function processVideo(file, start, onStatus) {

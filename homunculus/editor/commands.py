@@ -2,6 +2,7 @@
 
 import math
 import re
+from homunculus.retarget.body import BODY_BONES
 
 
 def obj(properties=None, required=()):
@@ -66,6 +67,36 @@ CURVE = enum(
     'expo_out',
 )  # segments.CURVES
 SPECS = {
+    'navigate_stage': (
+        'Open the Capture, Import, Review, Edit or Export workspace. Muse remains available in every stage.',
+        obj({'stage': enum('capture', 'import', 'review', 'edit', 'export')}, ('stage',)),
+    ),
+    'list_library': (
+        'List saved assets in the local library (captures, recordings, animations, projects, scenes, character) with id, title, kind and dates.',
+        obj(),
+    ),
+    'open_library_asset': (
+        'Open a library asset by id from list_library: a capture or project replaces the current animation, a scene replaces the stage, an animation GLB previews in the viewport, an unconverted recording is made ready to convert. Undo restores the previous animation. Muse cannot rename or delete assets.',
+        obj({'id': {'type': 'string', 'minLength': 1, 'maxLength': 400}}, ('id',)),
+    ),
+    'save_to_library': (
+        'Save the current character GLB, animation project or preview scene into the local library. Refused while edits are unapplied.',
+        obj({'format': enum('character', 'project', 'scene')}, ('format',)),
+    ),
+    'compose_motion': (
+        'Mask exports only selected local joint tracks. Layer replaces selected joints from an attached full-body capture, fitted to base duration, preserving other base tracks. Sequence joins the selected joints with a transition; other joints hold the end of the base after it ends. rootMotion selects pelvis translation separately. Parent movement still carries child joints. Undo restores the previous composition. No world-space pinning.',
+        obj(
+            {
+                'mode': enum('mask', 'layer', 'sequence'),
+                'bones': {'type': 'array', 'items': enum(*BODY_BONES), 'maxItems': 19},
+                'rootMotion': BOOL,
+                'blend': num(0, 5),
+                'sourceId': TEXT,
+            },
+            ('mode', 'bones', 'rootMotion'),
+        ),
+    ),
+    'clear_composition': ('Restore the complete base animation without a mask or second clip.', obj()),
     'adjust_pose': (
         'Rotate one spatial reference keyframe in joint-local space, then re-simulate. Shoulder supports x/y/z; elbow supports z only. Speed and joint constraints may reject the edit.',
         obj(
@@ -84,7 +115,21 @@ SPECS = {
     ),
     'set_settings': (
         'Change only specified motion controls, recording view or physics overlay. Simulates changed motion. Captured angles cannot be replaced.',
-        obj({'edit': EDIT, 'view': enum('auto', 'front', 'side'), 'showPhysics': BOOL}),
+        obj(
+            {
+                'edit': EDIT,
+                'view': enum('auto', 'front', 'side'),
+                'showPhysics': BOOL,
+                'rotation': obj(
+                    {'pitch': num(-180, 180), 'yaw': num(-180, 180), 'roll': num(-180, 180)},
+                    ('pitch', 'yaw', 'roll'),
+                ),
+            }
+        ),
+    ),
+    'set_animation_rotation': (
+        'Set absolute whole-character rotation in degrees: pitch around X, yaw around Y, roll around Z, in that order. Unspecified axes keep their values. Pivot at starting hips; applies after composition, is undoable, saved with the project/reference and baked into character GLB. Does not change source video or physics overlay. Set all axes to zero to reset.',
+        obj({'pitch': num(-180, 180), 'yaw': num(-180, 180), 'roll': num(-180, 180)}),
     ),
     'set_scene': (
         'Set visual stage background, grid, light, camera or replace visual props. Props do NOT collide; use edit.obstacle for the simulated obstacle.',
@@ -92,7 +137,7 @@ SPECS = {
     ),
     'playback': (
         'Play/pause, seek in seconds, or switch between simulation and exported-clip replay.',
-        obj({'playing': BOOL, 'time': num(0, 30), 'replay': BOOL}),
+        obj({'playing': BOOL, 'time': num(0, 60), 'replay': BOOL}),
     ),
     'simulate': ('Re-run the current physical motion.', obj()),
     'optimize': ('Run the bounded controller search for the current spatial capture.', obj()),
@@ -155,7 +200,7 @@ SPECS = {
     ),
     'export_asset': (
         'Download the current arm glTF, character GLB, reference, session or reusable scene JSON to the user browser.',
-        obj({'format': enum('arm', 'character', 'reference', 'session', 'scene')}, ('format',)),
+        obj({'format': enum('arm', 'character', 'reference', 'session', 'scene', 'project')}, ('format',)),
     ),
 }
 

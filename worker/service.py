@@ -12,6 +12,8 @@ Uploads and outputs stay under private/jobs/.
 
 Run from the deployed folder (holding .venv, checkpoints, sam-3d-body, homunculus/, worker/):
     .venv/bin/python -m worker.service --host 127.0.0.1 --port 8766
+Set HOMUNCULUS_SAM_ROOT when .venv, checkpoints and sam-3d-body live elsewhere (see
+scripts/setup_local_sam.sh). Without with-gpu.sh, jobs run directly on the GPU.
 """
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -19,6 +21,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 import argparse
 import json
+import os
 import queue
 import re
 import subprocess
@@ -27,7 +30,8 @@ import time
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]  # the deployed folder
-JOBS = ROOT / 'private' / 'jobs'
+SAM = Path(os.environ.get('HOMUNCULUS_SAM_ROOT', ROOT))  # .venv, checkpoints, sam-3d-body
+JOBS = SAM / 'private' / 'jobs'
 GPU = Path.home() / 'experiments' / 'with-gpu.sh'
 MAX_UPLOAD = 200 * 1024 * 1024
 BASIS = ['1', '0', '0', '0', '-1', '0', '0', '0', '-1']  # camera -> puppet, as used for every capture so far
@@ -46,19 +50,37 @@ def duration(video):
         ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(video)],
         text=True,
     )
-    return float(out.strip())
+    if out.strip() not in ('', 'N/A'):
+        return float(out.strip())
+    # Browser-recorded webm has no duration header; the last packet's timestamp gives it.
+    out = subprocess.check_output(
+        [
+            'ffprobe',
+            '-v',
+            'error',
+            '-select_streams',
+            'v',
+            '-show_entries',
+            'packet=pts_time',
+            '-of',
+            'csv=p=0',
+            str(video),
+        ],
+        text=True,
+    )
+    return max(float(line.split(',')[0]) for line in out.split() if line.split(',')[0] not in ('', 'N/A'))
 
 
 def command(job):
-    checkpoint = ROOT / 'checkpoints' / 'sam-3d-body-dinov3'
+    checkpoint = SAM / 'checkpoints' / 'sam-3d-body-dinov3'
     cmd = [
-        str(GPU),
-        str(ROOT / '.venv/bin/python'),
+        *([str(GPU)] if GPU.exists() else []),
+        str(SAM / '.venv/bin/python'),
         '-m',
         'worker.capture_video',
         str(job['video']),
         '--sam-root',
-        str(ROOT / 'sam-3d-body'),
+        str(SAM / 'sam-3d-body'),
         '--checkpoint',
         str(checkpoint / 'model.ckpt'),
         '--mhr',
@@ -80,7 +102,7 @@ def command(job):
     return cmd + (
         ['--bbox', *map(str, job['bbox'])]
         if job['bbox']
-        else ['--detect', str(ROOT / 'checkpoints' / 'vitdet')]
+        else ['--detect', str(SAM / 'checkpoints' / 'vitdet')]
     )
 
 
@@ -145,6 +167,8 @@ def work():
         done = (job['dir'] / 'capture' / 'capture.json').is_file()
         job['status'] = 'done' if code == 0 and done else 'failed'
         job['message'] = 'Capture ready' if job['status'] == 'done' else f'capture_video.py exited {code}'
+        if job['status'] == 'failed' and 'OutOfMemory' in ' '.join(tail(job, 40)):
+            job['message'] = 'The GPU ran out of memory. Close other GPU programs and try again.'
 
 
 def tail(job, lines=12):
@@ -173,7 +197,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         match = re.fullmatch(r'/jobs/([0-9a-f]{32})(/capture\.json|/video\.mp4)?', urlparse(self.path).path)
         if self.path == '/health':
-            return self.send(200, {'ok': True, 'jobs': len(jobs)})
+            active = sum(job['status'] not in ('done', 'failed') for job in jobs.values())
+            return self.send(200, {'ok': True, 'jobs': len(jobs), 'active': active})
         if not match or match[1] not in jobs:
             return self.send(404, {'error': 'Unknown job'})
         job = jobs[match[1]]

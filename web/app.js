@@ -1,6 +1,10 @@
+import { createCapture } from './capture.js';
+import { createComposer } from './composer.js';
+import { createLibrary } from './library.js';
+import { createWorkflow } from './workflow.js';
 import { createStage } from './stage3d.js';
 import { createWorkspace } from './workspace.js';
-import { processVideo } from './jobs.js';
+import { describeWorker, processVideo, setWorkerMode, workerStatus } from './jobs.js';
 import {
   armPoints,
   quaternionArm,
@@ -12,8 +16,32 @@ import {
 } from './motion-math.js';
 import { formatSegments } from './segments.js';
 const $ = id => document.getElementById(id);
+let workflow = null,
+  composer = null,
+  library = null,
+  processing = false,
+  activeComposition = null;
+let glbPreview = null,
+  assetName = 'homunculus';
+const playbackDuration = () => glbPreview?.duration || result?.playback_duration || current?.duration || 4;
+const rotationAxes = ['pitch', 'yaw', 'roll'];
+const rotationFields = () =>
+  Object.fromEntries(
+    rotationAxes.map(axis => [
+      axis,
+      $('rotation-' + axis).value.trim() === '' ? NaN : Number($('rotation-' + axis).value),
+    ]),
+  );
+const rotationDirty = () =>
+  !!activeCapture &&
+  rotationAxes.some(axis => rotationFields()[axis] !== (activeCapture.animation_rotation?.[axis] || 0));
+const dirty = () =>
+  rotationDirty() ||
+  !!composer?.dirty ||
+  (!!current && Object.entries(fields()).some(([k, v]) => v !== (appliedFields || current)[k]));
 const names = ['duration', 'shoulder_deg', 'elbow_deg', 'strength', 'damping'];
 let current = null,
+  appliedFields = null,
   result = null,
   gltf = null,
   characterGlb = null,
@@ -85,10 +113,20 @@ function lock(value) {
     $(id).disabled = value || activeCapture?.retargeting !== 'spatial_arm_v1';
   $('propose').disabled = value || (!!activeCapture && activeCapture.retargeting !== 'spatial_arm_v1');
   $('video-file').disabled = value || hashingVideo;
-  $('use-capture').disabled = value || hashingVideo || !pendingCapture || !$('review-capture').checked;
+  $('use-capture').disabled =
+    value || processing || hashingVideo || !pendingCapture || !$('review-capture').checked;
+  $('animation-rotation').disabled = value || processing || !activeCapture || !characterGlb;
+  workflow?.sync();
 }
-async function simulate(edit, source = 'manual', remember = true, capture = activeCapture, optimize = false) {
-  if (busy) return;
+async function simulate(
+  edit,
+  source = 'manual',
+  remember = true,
+  capture = activeCapture,
+  optimize = false,
+  composition = activeComposition,
+) {
+  if (busy || processing) return;
   lock(true);
   $('message').textContent = 'Simulating physical response…';
   try {
@@ -97,6 +135,7 @@ async function simulate(edit, source = 'manual', remember = true, capture = acti
       edit,
       capture,
       physics_arm: $('physics-arm').checked,
+      composition,
       ...(view === 'auto' ? {} : { view }),
     });
     if (remember) redoHistory = [];
@@ -104,6 +143,10 @@ async function simulate(edit, source = 'manual', remember = true, capture = acti
     edit = payload.result.edit;
     current = edit;
     activeCapture = capture;
+    syncRotation();
+    activeComposition = composition;
+    composer?.applied(composition);
+    pathSource = null;
     showSegments();
     result = payload.result;
     gltf = payload.gltf;
@@ -112,6 +155,8 @@ async function simulate(edit, source = 'manual', remember = true, capture = acti
     exported = false;
     replayFrames = null;
     stage?.setReplayClip(null);
+    glbPreview = null;
+    $('glb-close').hidden = true;
     $('export-character').disabled = !characterGlb;
     proposal = null;
     $('accept').hidden = true;
@@ -119,23 +164,18 @@ async function simulate(edit, source = 'manual', remember = true, capture = acti
     $('shoulder_deg').disabled = !!capture;
     $('elbow_deg').disabled = !!capture;
     $('source-note').textContent = capture
-      ? 'Imported ' +
-        capture.provenance.kind +
-        ' arm motion · Fixed shoulder · Recorded angles own the pose; duration, strength and damping remain editable. Muse can edit timing and bounded joint-local pose corrections; full-body poses and forces are not supported.'
-      : 'Original procedural reference · MuJoCo torque control · Fixed shoulder. Arm-to-character retargeting is available; full-body balance is not included.';
+      ? 'Captured motion drives the character. Arm physics is optional; full-body physical balance is not simulated.'
+      : 'Sample supported-arm reach. Import a recording for captured body motion.';
     audit.push({ source, edit: structuredClone(edit), at: new Date().toISOString() });
     fill(edit);
+    appliedFields = fields();
     $('error').textContent = result.metrics.tracking_rmse_deg.toFixed(2) + '°';
     $('contact').textContent = result.metrics.contact_steps;
     $('speed').textContent = Math.round(result.metrics.simulation_wall_s * 1000) + ' ms';
-    $('message').textContent =
-      (result.feasibility && !result.feasibility.passed
-        ? 'Feasibility limits exceeded. '
-        : 'Result ready. ') +
-      'Peak penetration ' +
-      (result.metrics.max_penetration_m * 1000).toFixed(2) +
-      ' mm. Export contains the actual simulated motion.';
-    $('view-label').textContent = 'Physical result · fixed shoulder';
+    $('message').textContent = capture
+      ? 'Animation ready. Review the motion, then edit or export.'
+      : 'Sample ready. Import a performance or explore the editing controls.';
+    $('view-label').textContent = activeCapture ? 'Captured motion' : 'Sample arm reach';
     $('replay').textContent = 'Replay export';
     return true;
   } catch (e) {
@@ -212,7 +252,7 @@ $('redo').onclick = async () => {
   }
 };
 $('propose').onclick = async () => {
-  if (busy) return;
+  if (busy || processing) return;
   lock(true);
   $('meta-status').textContent = 'Asking Muse Spark…';
   proposal = null;
@@ -268,7 +308,14 @@ $('export-character').onclick = () => {
 };
 $('save').onclick = () =>
   result &&
-  download('force-puppet-session.json', { edit: current, capture: activeCapture, audit, result, gltf });
+  download('force-puppet-session.json', {
+    edit: current,
+    capture: activeCapture,
+    composition: activeComposition,
+    audit,
+    result,
+    gltf,
+  });
 function reviewReady() {
   lock(busy);
 }
@@ -304,6 +351,15 @@ async function loadVideo(f) {
     hashingVideo = false;
     reviewReady();
   }
+}
+function clearVideo() {
+  if (videoURL) URL.revokeObjectURL(videoURL);
+  videoURL = videoHash = null;
+  $('source-video').removeAttribute('src');
+  $('source-pane').hidden = true;
+  $('comparison').classList.remove('has-video', 'show-source');
+  $('compare-source').setAttribute('aria-pressed', 'false');
+  document.body.classList.remove('comparison-active');
 }
 $('video-file').onchange = () => loadVideo($('video-file').files[0]);
 $('capture-file').onchange = async () => {
@@ -369,7 +425,9 @@ $('replay').onclick = async () => {
   }
   $('view-label').textContent = exported
     ? 'glTF replay · decoded animation buffers' + (characterGlb ? ' (arm + character clip)' : '')
-    : 'Physical result · fixed shoulder';
+    : activeCapture
+      ? 'Captured motion'
+      : 'Sample arm reach';
   $('replay').textContent = exported ? 'Back to simulation' : 'Replay export';
 };
 $('play').onclick = () => {
@@ -378,7 +436,7 @@ $('play').onclick = () => {
   $('play').setAttribute('aria-label', playing ? 'Pause playback' : 'Play playback');
 };
 $('timeline').oninput = () => {
-  if (current) cursor = Number($('timeline').value) * current.duration;
+  if (current) cursor = Number($('timeline').value) * playbackDuration();
 };
 let stage = null,
   pathSource = null;
@@ -391,22 +449,19 @@ function syncPath() {
   const frames = exported ? replayFrames : result?.frames;
   if (!stage || frames === pathSource) return;
   pathSource = frames;
-  stage.setPath(
-    frames?.map(f => armPoints(f).hand),
-    exported,
-  );
+  stage.setPath(activeComposition ? [] : frames?.map(f => armPoints(f).hand), exported);
 }
 
 function draw(now) {
   const dt = Math.min((now - previous) / 1000, 0.1);
   previous = now;
-  if (result && playing) cursor = (cursor + dt) % current.duration;
+  if (result && playing) cursor = (cursor + dt) % playbackDuration();
   let state = { obstacle: current?.obstacle ?? $('obstacle').checked, actual: null, target: null };
   if (result) {
     const frames = exported ? replayFrames : result.frames;
     const f = sampleFrames(frames, cursor);
     const original = sampleFrames(result.frames, cursor);
-    if (videoURL) {
+    if (videoURL && activeComposition?.mode !== 'sequence') {
       const video = $('source-video');
       let sourceTime = null;
       if (activeCapture && videoHash === activeCapture.provenance.video_sha256) {
@@ -452,13 +507,24 @@ function draw(now) {
                   : 'No source time map: playback is not synchronized';
       }
     }
+    if (videoURL && activeComposition?.mode === 'sequence')
+      $('sync-status').textContent =
+        'Joined animation: source comparison is paused because it contains two clips.';
     state = {
       obstacle: !!current.obstacle,
       actual: armPoints(f),
       target: targetPoints(original),
       replay: exported,
       contact: !exported && !!original.contacts,
-      label: exported ? 'EXPORTED MOTION' : original.contacts ? 'CONTACT' : 'REACH',
+      label: glbPreview
+        ? 'SAVED GLB'
+        : activeComposition
+          ? 'COMPOSED MOTION'
+          : exported
+            ? 'EXPORTED MOTION'
+            : original.contacts
+              ? 'CONTACT'
+              : 'REACH',
       showPhysics: $('show-physics').checked,
       character: result.retarget
         ? {
@@ -468,12 +534,12 @@ function draw(now) {
             bones: result.retarget.mode === 'body' ? result.retarget.bones : null,
             translationBone: result.retarget.translation_bone || null,
             translation: sampleTranslation(result.retarget.frames, cursor),
-            replayTime: exported ? cursor : null,
+            replayTime: exported || glbPreview ? cursor : null,
           }
         : null,
     };
-    $('timeline').value = cursor / current.duration;
-    $('time').textContent = cursor.toFixed(2) + ' / ' + current.duration.toFixed(2) + ' s';
+    $('timeline').value = cursor / playbackDuration();
+    $('time').textContent = cursor.toFixed(2) + ' / ' + playbackDuration().toFixed(2) + ' s';
   }
   if (stage) {
     syncPath();
@@ -508,6 +574,77 @@ fetch('/api/status')
   });
 const initialRun = simulate(fields(), 'initial procedural fixture', false);
 
+async function closeGlbPreview() {
+  glbPreview = null;
+  $('glb-close').hidden = true;
+  await stage?.setReplayClip(null);
+  $('view-label').textContent = activeCapture ? 'Captured motion' : 'Sample arm reach';
+  cursor = 0;
+  workflow.sync();
+}
+$('glb-close').onclick = closeGlbPreview;
+async function previewGlb(item) {
+  if (!stage?.hasCharacter) throw Error('Previewing a GLB needs a character rig loaded in the editor.');
+  if (exported) await originalReplay();
+  const blob = await fetchAsset(item.id);
+  const duration = await stage.setReplayClip(await blob.arrayBuffer());
+  glbPreview = { duration };
+  cursor = 0;
+  $('glb-close').hidden = false;
+  $('view-label').textContent = 'Saved GLB · ' + item.title;
+  $('message').textContent =
+    'Previewing ' + item.title + '. A GLB plays back only; open its project or capture to edit.';
+  workflow.close();
+  workflow.sync();
+  return { status: 'Previewing GLB', title: item.title, duration };
+}
+async function fetchAsset(id) {
+  const r = await fetch('/library/file?id=' + encodeURIComponent(id));
+  if (!r.ok) throw Error((await r.json()).error || 'Could not read the file');
+  return r.blob();
+}
+function stageUpload(file) {
+  const files = new DataTransfer();
+  files.items.add(file);
+  $('process-file').files = files.files;
+  $('process-start').value = '0';
+  $('process-file').dispatchEvent(new Event('change'));
+  library.showImport();
+  workflow.go(0);
+  workflow.sync();
+}
+// What opening an asset means depends on its kind; the workspace applies any returned file.
+async function openAsset(id) {
+  let item = await api('/api/library/open', { id });
+  if (item.kind === 'recording' && item.capture_id)
+    item = await api('/api/library/open', { id: item.capture_id });
+  if (item.kind === 'character') throw Error('The active character is set when the editor starts.');
+  if (item.kind === 'animation') return { result: await previewGlb(item) };
+  const blob = await fetchAsset(item.id);
+  if (item.kind === 'recording') {
+    stageUpload(new File([blob], item.file, { type: blob.type }));
+    return { result: { status: 'Recording ready to convert', title: item.title } };
+  }
+  if (item.kind === 'capture' && item.video) {
+    const video = await (await fetch('/clip/video')).blob();
+    await loadVideo(new File([video], item.video_id.split('/').pop(), { type: video.type }));
+  } else if (item.kind !== 'scene') clearVideo();
+  return {
+    file: new File([blob], item.file, { type: 'application/json' }),
+    done() {
+      if (item.kind !== 'scene') assetName = item.title;
+      if (item.kind === 'capture') workflow.go(1);
+      if (item.kind === 'scene') workflow.close();
+    },
+  };
+}
+async function saveAsset(name, body) {
+  const item = await library.upload(name, body);
+  $('message').textContent = 'Saved ' + item.title + ' to the library.';
+  library.refresh();
+  return { status: 'Saved to library', id: item.id, title: item.title };
+}
+
 // Manual buttons and Muse use this same action surface. No eval or DOM automation.
 const originalReplay = $('replay').onclick,
   originalCharacterExport = $('export-character').onclick;
@@ -520,11 +657,23 @@ async function segmentCommand(operation) {
   showSegments();
   return { segments: payload.segments, physicsArm: $('physics-arm').checked };
 }
+function syncRotation() {
+  const rotation = activeCapture?.animation_rotation || {};
+  for (const axis of rotationAxes) $('rotation-' + axis).value = rotation[axis] || 0;
+  $('rotation-status').textContent = activeCapture
+    ? `Applied: pitch ${rotation.pitch || 0}°, yaw ${rotation.yaw || 0}°, roll ${rotation.roll || 0}°.`
+    : 'Open a captured animation to rotate it.';
+}
 function showSegments() {
   $('segment-list').textContent = formatSegments(activeCapture?.timing?.segments || []);
 }
-async function requireSimulation(edit = current, capture = activeCapture, optimize = false) {
-  if (!(await simulate(edit, 'workspace command', false, capture, optimize)))
+async function requireSimulation(
+  edit = current,
+  capture = activeCapture,
+  optimize = false,
+  composition = activeComposition,
+) {
+  if (!(await simulate(edit, 'workspace command', false, capture, optimize, composition)))
     throw Error($('message').textContent);
   appliedView = $('character-view').value;
   appliedPhysics = $('show-physics').checked;
@@ -545,7 +694,17 @@ async function timelineCommand(commands = null, three = false) {
 function inspect() {
   return {
     settings: { edit: current || fields(), view: appliedView, showPhysics: appliedPhysics },
-    playback: { playing, time: cursor, replay: exported },
+    stage: workflow?.stage || 'import',
+    availableBones: result?.available_bones || result?.retarget?.bones || [],
+    composition: activeComposition
+      ? {
+          mode: activeComposition.mode,
+          bones: activeComposition.bones,
+          rootMotion: activeComposition.rootMotion,
+          blend: activeComposition.blend,
+        }
+      : null,
+    playback: { playing, time: cursor, replay: exported, duration: playbackDuration() },
     characterLoaded: !!stage?.hasCharacter,
     capture: activeCapture
       ? { kind: activeCapture.provenance.kind, retargeting: activeCapture.retargeting }
@@ -558,16 +717,36 @@ function inspect() {
       })) || [],
     segments: activeCapture?.timing?.segments || [],
     sourceDuration: activeCapture ? activeCapture.frames.at(-1).t - activeCapture.frames[0].t : null,
+    animationRotation: { pitch: 0, yaw: 0, roll: 0, ...activeCapture?.animation_rotation },
     physicsArm: $('physics-arm').checked,
     metrics: result?.metrics || null,
-    limits: 'Supported arm only; other body joints remain at rest. Decorative scene props have no collision.',
+    limits:
+      'Captured full-body motion is kinematic. Physics and pose correction affect the supported arm only. Decorative props have no collision.',
   };
 }
 const workspace = createWorkspace({
   inspect,
   fields,
+  pendingRotation: () => (activeCapture && rotationDirty() ? rotationFields() : null),
   download,
-  busy: () => busy,
+  busy: () => busy || processing,
+  attachmentsChanged: () => composer?.refreshSources(),
+  loadProject: async project => {
+    if (project.schema !== 'homunculus.project.v1' || !project.capture)
+      throw Error('Choose a saved animation project');
+    await api('/api/capture/validate', { capture: project.capture });
+    await requireSimulation(project.edit, project.capture, false, project.composition || null);
+    if (project.composition?.source) {
+      const item = await workspace.attach(
+        new File([JSON.stringify(project.composition.source)], 'project-second-capture.json', {
+          type: 'application/json',
+        }),
+      );
+      $('composition-source').value = item.id;
+    }
+    workflow.go(2);
+    return { status: 'Animation project restored', duration: playbackDuration() };
+  },
   configureScene: settings => stage?.configure(settings),
   validate: (name, args) => api('/api/commands/validate', { name, arguments: args }),
   validateCapture: capture => api('/api/capture/validate', { capture }),
@@ -576,6 +755,7 @@ const workspace = createWorkspace({
     structuredClone({
       edit: current || fields(),
       capture: activeCapture,
+      composition: activeComposition,
       view: appliedView,
       showPhysics: appliedPhysics,
       playing,
@@ -583,12 +763,14 @@ const workspace = createWorkspace({
     }),
   restore: async value => {
     $('character-view').value = value.view;
-    await requireSimulation(value.edit, value.capture);
+    await requireSimulation(value.edit, value.capture, false, value.composition || null);
     $('show-physics').checked = appliedPhysics = value.showPhysics;
     playing = value.playing;
     cursor = value.time;
   },
   useVideo: loadVideo,
+  openAsset,
+  saveAsset,
   useCapture: async capture => {
     await api('/api/capture/validate', { capture });
     if (hashingVideo) throw Error('Wait for source video hashing');
@@ -598,10 +780,72 @@ const workspace = createWorkspace({
       duration = capture.reference_animation?.keyframes.at(-1).time ?? frames.at(-1).t - frames[0].t;
     if (capture.retargeting === 'spatial_arm_v1')
       capture = (await api('/api/reference', { capture, duration })).capture;
-    await requireSimulation({ ...fields(), duration, obstacle: false }, capture);
+    await requireSimulation({ ...fields(), duration, obstacle: false }, capture, false, null);
     return { status: 'Captured motion applied', duration };
   },
   actions: {
+    list_library: async () => {
+      const r = await fetch('/api/library');
+      const listing = await r.json();
+      if (!r.ok) throw Error(listing.error || 'Could not read the library');
+      return {
+        lastOpened: listing.last_opened,
+        assets: listing.items.map(({ id, kind, title, created, modified, size, meta }) => ({
+          id,
+          kind,
+          title,
+          created,
+          modified,
+          size,
+          duration: meta.duration,
+        })),
+      };
+    },
+    save_to_library: async ({ format }) => {
+      if (dirty()) throw Error('Apply your changes in Edit before saving.');
+      if (glbPreview) throw Error('Close the GLB preview before saving the current animation.');
+      if (format === 'character') {
+        if (!characterGlb) throw Error('No character export available');
+        return saveAsset(assetName + '.glb', new Blob([glbBytes(characterGlb)]));
+      }
+      if (!activeCapture) throw Error('Open a captured animation first.');
+      return saveAsset(
+        assetName + '.json',
+        JSON.stringify({
+          schema: 'homunculus.project.v1',
+          edit: current,
+          capture: activeCapture,
+          composition: activeComposition,
+        }),
+      );
+    },
+    navigate_stage: async ({ stage: name }) => {
+      workflow.go(['import', 'review', 'edit', 'export', 'capture'].indexOf(name));
+      return { stage: name };
+    },
+    compose_motion: async (args, source) => {
+      if (!activeCapture) throw Error('Import a captured animation first.');
+      const { sourceId, ...options } = args;
+      await requireSimulation(current, activeCapture, false, { ...options, ...(source ? { source } : {}) });
+      workflow.go(2);
+      return {
+        composition: inspect().composition,
+        duration: playbackDuration(),
+        tracks: result.retarget.bones,
+      };
+    },
+    clear_composition: async () => {
+      await requireSimulation(current, activeCapture, false, null);
+      return { status: 'Full base restored' };
+    },
+    set_animation_rotation: async args => {
+      if (!activeCapture || !characterGlb)
+        throw Error('Open a captured animation with a character rig first.');
+      const capture = structuredClone(activeCapture);
+      capture.animation_rotation = { pitch: 0, yaw: 0, roll: 0, ...capture.animation_rotation, ...args };
+      await requireSimulation(current, capture);
+      return { rotation: capture.animation_rotation, pivot: 'starting hips' };
+    },
     set_settings: async args => {
       const oldView = appliedView;
       if (
@@ -612,7 +856,13 @@ const workspace = createWorkspace({
         throw Error('Captured poses own these angles; use adjust_pose instead');
       if (args.view) $('character-view').value = args.view;
       try {
-        if (args.edit || args.view) await requireSimulation({ ...current, ...args.edit });
+        if (args.rotation && (!activeCapture || !characterGlb))
+          throw Error('Open a captured animation with a character rig first.');
+        const capture = args.rotation
+          ? { ...structuredClone(activeCapture), animation_rotation: args.rotation }
+          : activeCapture;
+        if (args.edit || args.view || args.rotation)
+          await requireSimulation({ ...current, ...args.edit }, capture);
       } catch (e) {
         $('character-view').value = oldView;
         throw e;
@@ -621,7 +871,7 @@ const workspace = createWorkspace({
       return inspect().settings;
     },
     playback: async args => {
-      if (args.time !== undefined && args.time > current.duration)
+      if (args.time !== undefined && args.time > playbackDuration())
         throw Error('Seek exceeds animation duration');
       if (args.replay !== undefined && args.replay !== exported) {
         if (!gltf) throw Error('No export is available');
@@ -635,21 +885,48 @@ const workspace = createWorkspace({
     },
     simulate: () => requireSimulation(),
     optimize: () => requireSimulation(current, activeCapture, true),
-    use_demo: () => requireSimulation(fields(), null),
+    use_demo: async () => {
+      await requireSimulation(fields(), null, false, null);
+      workflow.go(1);
+    },
     edit_timeline: args => timelineCommand(args.commands),
     assemble_three_poses: () => timelineCommand(null, true),
     export_asset: async ({ format }) => {
       if (!result) throw Error('No result available');
+      if (dirty()) throw Error('Apply your changes in Edit before exporting.');
+      if (glbPreview) throw Error('Close the GLB preview before exporting the current animation.');
+      if (activeComposition && ['arm', 'reference'].includes(format))
+        throw Error(
+          'This format contains only the base motion. Use character GLB or Save animation project for the composed result.',
+        );
+      if (format === 'arm' && Object.values(activeCapture?.animation_rotation || {}).some(v => v !== 0))
+        throw Error(
+          'Animation rotation is included in the character GLB. Choose character export or reset rotation for the arm-only export.',
+        );
       if (format === 'arm') download('homunculus-arm.gltf', gltf);
       if (format === 'character') {
         if (!characterGlb) throw Error('No character export available');
         originalCharacterExport();
       }
+      if (format === 'project')
+        download('homunculus-project.json', {
+          schema: 'homunculus.project.v1',
+          edit: current,
+          capture: activeCapture,
+          composition: activeComposition,
+        });
       if (format === 'session')
-        download('homunculus-session.json', { edit: current, capture: activeCapture, audit, result, gltf });
+        download('homunculus-session.json', {
+          edit: current,
+          capture: activeCapture,
+          composition: activeComposition,
+          audit,
+          result,
+          gltf,
+        });
       if (format === 'reference') {
         if (!activeCapture) throw Error('No captured reference');
-        const p = await api('/api/reference', { capture: activeCapture, duration: fields().duration });
+        const p = await api('/api/reference', { capture: activeCapture, duration: current.duration });
         download('homunculus-reference.json', p.capture);
       }
       return { status: 'Download requested', format };
@@ -664,6 +941,20 @@ const workspace = createWorkspace({
     },
   },
 });
+$('apply-rotation').onclick = () => {
+  if (
+    rotationAxes.some(
+      axis => !$('rotation-' + axis).checkValidity() || !Number.isFinite(rotationFields()[axis]),
+    )
+  ) {
+    $('rotation-status').textContent = 'Enter an angle from -180 to 180 degrees for every axis.';
+    return;
+  }
+  workspace.manual('set_animation_rotation', rotationFields()).catch(() => {});
+};
+$('reset-rotation').onclick = () =>
+  workspace.manual('set_animation_rotation', { pitch: 0, yaw: 0, roll: 0 }).catch(() => {});
+for (const axis of rotationAxes) $('rotation-' + axis).addEventListener('input', () => workflow?.sync());
 $('edit-key').onclick = async () => {
   try {
     const k = activeCapture?.reference_animation?.keyframes[Number($('key-index').value) - 1];
@@ -727,18 +1018,25 @@ $('use-capture').onclick = async () => {
     });
     const item = await workspace.attach(file);
     await workspace.manual('use_attachment', { id: item.id });
+    workflow.go(1);
   } catch (e) {
     $('message').textContent = e.message;
     $('capture-status').textContent = e.message;
   }
 };
 // A processed clip goes through the same attach + use_attachment path as a manual import.
-async function applyClip(capture, name) {
+async function applyClip(capture, name, reveal = true) {
   const item = await workspace.attach(
     new File([JSON.stringify(capture)], name + '-capture.json', { type: 'application/json' }),
   );
-  const done = await workspace.manual('use_attachment', { id: item.id });
-  if (done?.ok === false) throw Error(done.error || 'capture rejected');
+  try {
+    const done = await workspace.manual('use_attachment', { id: item.id });
+    if (done?.ok === false) throw Error(done.error || 'capture rejected');
+  } finally {
+    workspace.detach(item.id);
+  }
+  assetName = name;
+  workflow.go(1, reveal);
 }
 // On load, preview the newest processed clip (or --clip) with its source video.
 initialRun.then(async () => {
@@ -750,7 +1048,7 @@ initialRun.then(async () => {
       const blob = await (await fetch('/clip/video')).blob();
       await loadVideo(new File([blob], clip.video, { type: blob.type }));
     }
-    await applyClip(clip.capture, clip.name);
+    await applyClip(clip.capture, clip.name, false);
     $('capture-status').textContent =
       'Previewing clip ' + clip.name + (clip.video ? ' with source video ' + clip.video : '') + '.';
   } catch (e) {
@@ -758,17 +1056,49 @@ initialRun.then(async () => {
   }
 });
 // Submit a video to the SAM worker, follow the job, then apply the capture to the whole skeleton.
-$('process-file').onchange = async () => {
+$('process-file').onchange = () => {
+  $('job-status').textContent = $('process-file').files[0]
+    ? 'Video selected. Choose the start time, then convert up to 30 seconds.'
+    : 'Choose a video to begin.';
+  workflow.sync();
+};
+function showWorker(status) {
+  $('sam-local').checked = status.mode === 'local';
+  $('sam-status').textContent = describeWorker(status);
+}
+workerStatus()
+  .then(showWorker)
+  .catch(() => {});
+$('sam-local').onchange = async () => {
+  const box = $('sam-local');
+  const mode = box.checked ? 'local' : 'remote';
+  box.disabled = true;
+  $('sam-status').textContent =
+    mode === 'local' ? 'Starting the local worker…' : 'Switching to the remote worker…';
+  try {
+    showWorker(await setWorkerMode(mode));
+  } catch (e) {
+    box.checked = !box.checked;
+    $('sam-status').textContent = e.message;
+  } finally {
+    box.disabled = false;
+  }
+};
+$('process-submit').onclick = async () => {
   const f = $('process-file').files[0];
-  if (!f) return;
+  if (!f || !$('process-start').reportValidity()) return;
   const status = $('job-status');
+  processing = true;
+  workflow.sync();
   try {
     const { job, s, started } = await processVideo(f, Number($('process-start').value || 0), text => {
       status.textContent = text;
     });
     const blob = await (await fetch('/clip/video')).blob();
     await loadVideo(new File([blob], s.name + '.mp4', { type: 'video/mp4' })); // the exact video SAM ran on
+    processing = false;
     await applyClip(s.capture, s.name);
+    library.refresh();
     status.textContent =
       'Processed ' +
       job.seconds +
@@ -782,6 +1112,59 @@ $('process-file').onchange = async () => {
   } catch (e) {
     status.textContent = e.message;
   } finally {
-    $('process-file').value = '';
+    processing = false;
+    lock(false);
+    workflow.sync();
+  }
+};
+
+// A recorded take is converted exactly like a chosen file, with the same progress and retry in Import.
+const capture = createCapture(
+  file => {
+    stageUpload(file);
+    $('process-submit').click();
+  },
+  file => library.upload(file.name, file),
+  async () => {
+    const status = await workerStatus();
+    return status.reachable
+      ? 'GPU worker is ready to convert takes.'
+      : 'GPU worker is not reachable. Takes still save to the Library; convert them once it is back.';
+  },
+);
+library = createLibrary({
+  open: id => workspace.manual('open_library_asset', { id }),
+  showExport: () => workflow.go(3),
+});
+workflow = createWorkflow(
+  () => ({
+    capture: activeCapture,
+    duration: playbackDuration(),
+    dirty: dirty(),
+    busy,
+    processing,
+    character: !!characterGlb,
+    ready: !!result && !glbPreview,
+    preview: !!glbPreview,
+  }),
+  name => workspace.manual('navigate_stage', { stage: name }).catch(() => {}),
+  (open, name) => {
+    capture.setActive(open && name === 'capture');
+    if (open && name === 'import') library.refresh();
+  },
+);
+
+composer = createComposer(workspace, () => ({ refresh: () => workflow.sync() }));
+$('save-project').onclick = () => workspace.manual('export_asset', { format: 'project' }).catch(() => {});
+$('project-file').onchange = async () => {
+  const file = $('project-file').files[0];
+  if (!file) return;
+  try {
+    const item = await workspace.attach(file);
+    await workspace.manual('use_attachment', { id: item.id });
+  } catch (e) {
+    $('project-status').textContent = e.message;
+  } finally {
+    $('project-file').value = '';
   }
 };

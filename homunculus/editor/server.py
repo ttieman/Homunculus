@@ -10,25 +10,29 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from homunculus import ROOT
+from homunculus.animation.rotation import apply_rotation, rotation_values
 from homunculus.capture.prepare import prepare
 from homunculus.contracts import MAX_DOCUMENT_BYTES, object_value
 from homunculus.export.gltf import export_gltf
 from homunculus.muse.meta import propose, propose_reference, MODEL, configured_key
+from homunculus.animation.composition import compose, validate_options
 from homunculus.physics.settings import Edit
 from homunculus.physics.simulate import run
+from homunculus.editor.library import Library, MAX_FILE_BYTES, clean_name
+from homunculus.editor.sam_workers import Workers
 from homunculus.retarget import body as full_body
 from homunculus.retarget.arm import VIEWS, retarget as retarget_arm
 from homunculus.retarget.character_glb import b64, export_character_glb
 from homunculus.retarget.rig import configured_path, load_rig
 
 VIDEO_TYPES = {'.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime'}
-CLIPS = ROOT / 'private' / 'clips'
+STORAGE = ROOT / 'private'
 MAX_VIDEO_BYTES = 200 * 1024 * 1024
 UPLOAD_TYPES = ('.mp4', '.webm', '.mov', '.mkv', '.avi', '.mpg')  # the worker converts non-mp4 to mp4
 
 
-def latest_clip():
-    found = sorted(CLIPS.glob('*/capture.json'), key=lambda p: p.stat().st_mtime)
+def latest_clip(clips):
+    found = sorted(clips.glob('*/capture.json'), key=lambda p: p.stat().st_mtime)
     return found[-1].parent if found else None
 
 
@@ -61,14 +65,15 @@ def load_clip(path):
         ),
         None,
     )
-    return {'name': path.parent.name, 'capture': capture, 'video': video}
+    return {'name': path.parent.name, 'capture': capture, 'video': video, 'path': path}
 
 
 class Handler(BaseHTTPRequestHandler):
     rig = None  # optional external character (see retarget/rig.py)
     clip = None  # optional capture (+ matching source video) preloaded into the editor
-    worker = 'http://127.0.0.1:8766'  # SAM 3D Body job service (worker_service.py)
-    jobs = {}  # worker job id -> local clip folder
+    workers = Workers('http://127.0.0.1:8766')  # SAM 3D Body job services (worker/service.py)
+    jobs = {}  # worker job id -> (local clip folder, the worker that took it)
+    library = Library(STORAGE)
 
     def send(self, status, data, content_type='application/json'):
         encoded = json.dumps(data, allow_nan=False).encode() if content_type == 'application/json' else data
@@ -98,6 +103,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, {'error': str(exc)})
             except RuntimeError as exc:
                 return self.send(503, {'error': str(exc)})
+        if self.path == '/api/worker':
+            return self.send(200, self.workers.status())
+        url = urllib.parse.urlparse(self.path)
+        if url.path == '/api/library':
+            return self.send(200, self.library_listing())
+        if url.path == '/library/file':
+            query = urllib.parse.parse_qs(url.query)
+            try:
+                return self.send_asset(query.get('id', [''])[0], 'download' in query)
+            except ValueError as exc:
+                return self.send(404, {'error': str(exc)})
         if self.path == '/api/contracts':
             return self.send(200, {'max_document_bytes': MAX_DOCUMENT_BYTES})
         if self.path == '/api/commands':
@@ -114,6 +130,7 @@ class Handler(BaseHTTPRequestHandler):
                 },
             )
         if self.path == '/api/clip':
+            self.forget_deleted_clip()
             if not self.clip:
                 return self.send(404, {'error': 'No clip configured'})
             return self.send(
@@ -138,6 +155,11 @@ class Handler(BaseHTTPRequestHandler):
         paths = {
             '/': ('index.html', 'text/html; charset=utf-8'),
             '/app.js': ('app.js', js),
+            '/workflow.js': ('workflow.js', js),
+            '/composer.js': ('composer.js', js),
+            '/capture.js': ('capture.js', js),
+            '/library.js': ('library.js', js),
+            '/workflow.css': ('workflow.css', 'text/css; charset=utf-8'),
             '/stage3d.js': ('stage3d.js', js),
             '/workspace.js': ('workspace.js', js),
             '/jobs.js': ('jobs.js', js),
@@ -150,20 +172,72 @@ class Handler(BaseHTTPRequestHandler):
         name, mime = paths[self.path]
         self.send(200, (ROOT / 'web' / name).read_bytes(), mime)
 
+    def library_listing(self):
+        listing = self.library.list()
+        if self.rig:
+            listing['items'].append(
+                {
+                    'id': 'character',
+                    'kind': 'character',
+                    'title': Path(self.rig.source).stem,
+                    'file': Path(self.rig.source).name,
+                    'size': len(self.rig.blob),
+                    'meta': {},
+                    'read_only': True,
+                }
+            )
+        return listing
+
+    def send_asset(self, asset_id, download):
+        if asset_id == 'character' and self.rig:
+            blob, name = self.rig.blob, Path(self.rig.source).name
+        else:
+            path = self.library.path(asset_id)
+            blob, name = path.read_bytes(), path.name
+        mime = {'.json': 'application/json', '.glb': 'model/gltf-binary', **VIDEO_TYPES}.get(
+            Path(name).suffix.lower(), 'application/octet-stream'
+        )
+        self.send_response(200)
+        self.send_header('Content-Type', mime)
+        self.send_header('Content-Length', str(len(blob)))
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Cache-Control', 'no-store')
+        if download:
+            self.send_header('Content-Disposition', 'attachment; filename="' + clean_name(name) + '"')
+        self.end_headers()
+        try:
+            self.wfile.write(blob)
+        except ConnectionError:
+            pass  # a thumbnail <video> hangs up once it has the first frame
+
+    def open_asset(self, asset_id):
+        """Remember what was opened; a capture also becomes the clip a page reload shows."""
+        item = self.library.item(asset_id)
+        if item['kind'] == 'capture':
+            Handler.clip = load_clip(self.library.path(asset_id))
+            self.library.mark_opened(asset_id)
+            item['video'] = bool(Handler.clip['video'])
+        return item
+
+    def forget_deleted_clip(self):
+        clip = self.clip
+        if clip and not (clip['path'].is_file() and (clip['video'] is None or clip['video'].is_file())):
+            folder = clip['path'].parent if clip['path'].is_file() else latest_clip(self.library.clips)
+            Handler.clip = load_clip(folder) if folder else None
+
     def job_status(self, job_id):
         if job_id not in self.jobs:
             raise ValueError('Unknown job')
-        status = json.loads(worker_call(self.worker, f'/jobs/{job_id}'))
+        folder, worker = self.jobs[job_id]
+        status = json.loads(worker_call(worker, f'/jobs/{job_id}'))
         if status['status'] == 'done':
-            folder = self.jobs[job_id]
             if not (folder / 'capture.json').is_file():
                 (folder / (folder.name.split('-', 2)[-1] + '.mp4')).write_bytes(
-                    worker_call(self.worker, f'/jobs/{job_id}/video.mp4')
+                    worker_call(worker, f'/jobs/{job_id}/video.mp4')
                 )
-                (folder / 'capture.json').write_bytes(
-                    worker_call(self.worker, f'/jobs/{job_id}/capture.json')
-                )
+                (folder / 'capture.json').write_bytes(worker_call(worker, f'/jobs/{job_id}/capture.json'))
             Handler.clip = load_clip(folder)  # a page reload now opens this clip
+            self.library.mark_opened((folder / 'capture.json').relative_to(self.library.root).as_posix())
             status['name'], status['capture'] = folder.name, Handler.clip['capture']
         return status
 
@@ -177,18 +251,19 @@ class Handler(BaseHTTPRequestHandler):
         if Path(name).suffix.lower() not in UPLOAD_TYPES:
             raise ValueError('Use one of ' + ', '.join(UPLOAD_TYPES))
         video = self.rfile.read(size)
-        folder = CLIPS / f'{time.strftime("%Y%m%d-%H%M%S")}-{Path(name).stem}'
-        folder.mkdir(parents=True)
+        folder = self.library.clips / f'{time.strftime("%Y%m%d-%H%M%S")}-{Path(name).stem}'
         forward = {k: query[k][0] for k in ('start', 'seconds', 'side', 'bbox') if k in query}
+        worker = self.workers.url
         reply = json.loads(
             worker_call(
-                self.worker,
+                worker,
                 '/jobs?' + urllib.parse.urlencode({'name': name, **forward}),
                 video,
                 {'Content-Type': 'application/octet-stream'},
             )
         )
-        self.jobs[reply['id']] = folder
+        folder.mkdir(parents=True)  # only once the worker has accepted the job
+        self.jobs[reply['id']] = (folder, worker)
         return {'id': reply['id'], 'seconds': reply['seconds'], 'name': folder.name}
 
     def do_POST(self):
@@ -197,10 +272,26 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if urllib.parse.urlparse(self.path).path == '/api/jobs':
                 return self.send(202, self.submit_video())
+            if urllib.parse.urlparse(self.path).path == '/api/library/upload':
+                size = int(self.headers.get('Content-Length', '0'))
+                if not 0 < size <= MAX_FILE_BYTES:
+                    raise ValueError(f'File must be 1 to {MAX_FILE_BYTES} bytes')
+                query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                return self.send(200, self.library.add(query.get('name', [''])[0], self.rfile.read(size)))
             size = int(self.headers.get('Content-Length', '0'))
             if not 0 < size <= MAX_DOCUMENT_BYTES:
                 raise ValueError(f'Request size must be 1–{MAX_DOCUMENT_BYTES} bytes')
             body = object_value(json.loads(self.rfile.read(size)), 'request')
+            if self.path == '/api/worker':
+                return self.send(200, self.workers.set_mode(body.get('mode')))
+            if self.path == '/api/library/open':
+                return self.send(200, self.open_asset(body.get('id')))
+            if self.path == '/api/library/rename':
+                return self.send(200, self.library.rename(body.get('id'), body.get('title')))
+            if self.path == '/api/library/delete':
+                self.library.delete(body.get('id'))
+                self.forget_deleted_clip()
+                return self.send(200, {'deleted': body.get('id')})
             if self.path == '/api/chat':
                 from homunculus.muse.chat import turn
 
@@ -237,6 +328,7 @@ class Handler(BaseHTTPRequestHandler):
                     200, {'arguments': validate_command(body.get('name'), body.get('arguments'))}
                 )
             if self.path == '/api/capture/validate':
+                rotation_values(body['capture'].get('animation_rotation'))
                 motion = prepare(body['capture'])
 
                 track = full_body.body_track(body['capture'])
@@ -271,6 +363,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'capture': capture, 'reference': timeline.document})
             edit = Edit.parse(body['edit'])
             if self.path in ('/api/simulate', '/api/synthesize'):
+                rotation = rotation_values((body.get('capture') or {}).get('animation_rotation'))
+                if any(rotation.values()) and not self.rig:
+                    raise ValueError('Load a character rig to rotate the animation')
                 motion = prepare(body['capture']) if body.get('capture') is not None else None
                 if self.path == '/api/synthesize':
                     from homunculus.capture.spatial import SpatialMotion
@@ -282,6 +377,8 @@ class Handler(BaseHTTPRequestHandler):
                     result['optimization'] = report
                 else:
                     result = run(edit, motion)
+                if body.get('composition') is not None and not self.rig:
+                    raise ValueError('Load a character rig before composing animation')
                 payload = {'result': result, 'gltf': export_gltf(result)}
                 if self.rig:
                     view = body.get('view')
@@ -308,6 +405,36 @@ class Handler(BaseHTTPRequestHandler):
                         )
                     else:
                         result['retarget'] = retarget_arm(result, self.rig, view=view)
+                    result['available_bones'] = result['retarget']['bones'][:]
+                    composition = body.get('composition')
+                    if composition is not None:
+                        mode, _, _, _ = validate_options(composition)
+                        secondary = None
+                        if mode != 'mask':
+                            source = composition.get('source')
+                            if not isinstance(source, dict):
+                                raise ValueError('A second capture is required')
+                            other_motion = prepare(source)
+                            if full_body.body_track(source) is None:
+                                raise ValueError('Second capture must contain full-body keypoints')
+                            keys = (
+                                other_motion.timeline.document['keyframes']
+                                if getattr(other_motion, 'timeline', None)
+                                else None
+                            )
+                            duration = (
+                                keys[-1]['time']
+                                if keys
+                                else source['frames'][-1]['t'] - source['frames'][0]['t']
+                            )
+                            other_edit = Edit.parse(
+                                {**result['edit'], 'duration': duration, 'obstacle': False}
+                            )
+                            other_result = run(other_edit, other_motion)
+                            secondary = full_body.retarget_body(other_result, self.rig, source, keys)
+                        result['retarget'] = compose(result['retarget'], composition, secondary)
+                        result['playback_duration'] = result['retarget']['frames'][-1]['t']
+                    result['retarget'] = apply_rotation(result['retarget'], self.rig, rotation)
                     payload['character_glb'] = b64(
                         export_character_glb(
                             self.rig,
@@ -361,11 +488,21 @@ def main():
         help='open empty instead of preloading the newest clip (browser tests)',
     )
     parser.add_argument(
-        '--worker', default=Handler.worker, help='SAM 3D Body job service URL (default %(default)s)'
+        '--worker', default=Handler.workers.remote, help='SAM 3D Body job service URL (default %(default)s)'
+    )
+    parser.add_argument(
+        '--storage',
+        default=STORAGE,
+        help='folder holding clips, exports, projects and scenes (default %(default)s)',
     )
     args = parser.parse_args()
-    Handler.worker = args.worker
-    clip = None if args.no_clip else args.clip or latest_clip()
+    Handler.workers.remote = args.worker
+    Handler.library = Library(args.storage)
+    clip = (
+        None
+        if args.no_clip
+        else args.clip or Handler.library.last_opened_clip() or latest_clip(Handler.library.clips)
+    )
     if clip:
         try:
             Handler.clip = load_clip(clip)
